@@ -1,5 +1,7 @@
+@import url("https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css");
 .App {
   text-align: center;
+  min-height: 100vh;
 }
 
 .App-logo {
@@ -36,3 +38,17 @@
     transform: rotate(360deg);
   }
 }
+
+.hover-darken {
+  transition: all 0.3s ease; /* 設定 0.3 秒的平滑過渡 */
+  cursor: pointer;
+}
+
+.hover-darken:hover {
+  filter: brightness(0.95); 
+}
+
+.hover-darken:active {
+  transform: scale(0.98);
+}
+
