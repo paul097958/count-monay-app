@@ -1,7 +1,7 @@
 import './App.css';
 import { useEffect, useState, useRef } from 'react';
 import liff from "@line/liff";
-import { doc, getDoc, collection, getDocs, query, orderBy, limit, runTransaction } from "firebase/firestore";
+import { doc, getDoc, collection, getDocs, query, orderBy, limit, runTransaction, startAfter, where } from "firebase/firestore";
 import { db } from './config.js';
 import { LINE_LIFF } from './config.js';
 import BarChart from './components/BarChart.jsx';
@@ -9,6 +9,7 @@ import SetRecords from './components/SetRecords.jsx';
 import Loading from './components/Loading.jsx';
 import Prompt from './components/Prompt.jsx';
 import AddRecord from './components/AddRecord.jsx';
+import { getUserInfo, numberWithCommas } from './common/RecordFunction.js';
 
 
 
@@ -22,8 +23,12 @@ function App() {
   const [loading, setLoading] = useState(true)
   const [promptMenuState, setPromptMenuState] = useState(false)
   const [addRecordMenuState, setAddRecordMenuState] = useState(false)
+  const [hasMore, setHasMore] = useState(true)
+  const [userRecords, setUserRecords] = useState([])
+  const showTotalRef = useRef(0)
   const firstRef = useRef(true)
   const userInfo = useRef({})
+  const lastVisible = useRef(null)
 
   function updateOrAddUser(array, updateData) {
     const { uid } = updateData;
@@ -114,18 +119,90 @@ function App() {
       const q = query(
         collection(db, userInfo.current.groupId),
         orderBy("createdAt", "desc"),
-        limit(20)
+        limit(10)
       );
-      const querySnapshot = await getDocs(q);
-      const data = querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-      setRecordData(data)
+      const snapshot = await getDocs(q);
+      if (snapshot.empty) {
+        setHasMore(false);
+      } else {
+        lastVisible.current = snapshot.docs[snapshot.docs.length - 1];
+        const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        setRecordData(data);
+      }
     } catch (error) {
       console.error("讀取資料失敗：", error);
     }
   };
+
+  async function getNextData() {
+    try {
+      if (loading || !hasMore) return;
+      setLoading(true);
+      // 如果沒有上一次的最後一份文件，代表已經沒資料了或還沒開始
+      if (!lastVisible.current) {
+        console.log("沒有更多資料了");
+        return;
+      }
+
+      const q = query(
+        collection(db, userInfo.current.groupId),
+        orderBy("createdAt", "desc"),
+        startAfter(lastVisible.current), // 從上一次的結尾開始
+        limit(5)
+      );
+
+      const snapshot = await getDocs(q);
+
+      // 更新最後一份文件的位置
+      if (snapshot.empty) {
+        setHasMore(false);
+      } else {
+        lastVisible.current = snapshot.docs[snapshot.docs.length - 1];
+        const newData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+        // 累加資料
+        setRecordData(prev => [...prev, ...newData]);
+      }
+
+    } catch (error) {
+      console.error("讀取下一頁失敗：", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  async function getDocsByUserId() {
+    try {
+      const q = query(
+        collection(db, userInfo.current.groupId),
+        where("users", "array-contains", userInfo.current.sub),
+        orderBy("createdAt", "asc")
+      );
+      const querySnapshot = await getDocs(q);
+      const data = querySnapshot.docs.map(doc => {
+        const docData = doc.data();
+        let count = 0;
+        const borrowerFilter = docData.records.filter(item => item.borrower === userInfo.current.sub);
+        const debtorFilter = docData.records.filter(item => item.debtor === userInfo.current.sub);
+        borrowerFilter.forEach(item => count += item.debt)
+        debtorFilter.forEach(item => count -= item.debt)
+        console.log(count);
+        // Return an object or relevant data for each doc
+        return {
+          id: doc.id,
+          title: docData.title,
+          description: docData.description,
+          createdAt: docData.createdAt,
+          detail: [...borrowerFilter, ...debtorFilter],
+          users: docData.users,
+          shouldGet: count
+        };
+      });
+      setUserRecords(data);
+    } catch (error) {
+      console.error("查詢失敗：", error);
+    }
+  }
 
   function truncateText(str, maxLength) {
     if (!str) return '';
@@ -237,7 +314,7 @@ function App() {
         <div className="container-fluid">
           <a className="navbar-brand d-flex align-items-center gap-3" href="#">
             <img src="/logo.jpg" alt="Logo" height="35" className="d-inline-block align-text-top" />
-            <span className='fs-5'>算錢工具 v0.1.1</span>
+            <span className='fs-5'>算錢工具 v0.1.2</span>
           </a>
         </div>
       </nav>
@@ -282,6 +359,70 @@ function App() {
                   <span className="text-muted small ms-auto fw-light user-select-none mx-2" style={{ fontSize: '10px' }}>
                     {formatTimestamp(item.createdAt)}
                   </span>
+                </div>)
+              }
+            </div>
+            <div>
+              {
+                hasMore ? <i className="bi bi-plus-circle-fill fs-3" onClick={async () => {
+                  await getNextData()
+                }}></i> : ''
+              }
+            </div>
+          </div>
+          <div className='bg-light rounded border p-2 shadow shadow-sm mt-2'>
+            <div className='text-start'>
+              <p className='fs-6 fw-medium mb-0'>帳目詳情</p>
+              <p className='fw-light m-0' style={{ fontSize: '12px' }}>在這裡將顯示所有欠款與還款詳情</p>
+            </div>
+            <button className={`btn btn-outline-secondary mt-2 w-100 ${userRecords.length !== 0 ? 'd-none' : ''}`} onClick={async () => {
+              await getDocsByUserId()
+            }}>取得我的所有帳目</button>
+            <div className='text-start mt-2'>
+              <p className={`fw-bold mb-0 ${userRecords.length === 0 ? 'd-none' : ''}`}>總金額: {userRecords.reduce((sum, item) => sum + item.shouldGet, 0)}</p>
+              <p className={userRecords.length === 0 ? 'd-none' : ''}>{debtData
+                .filter(item => item.debt !== 0)
+                .map(item => item.debt)
+                .reduce((sum, current) => sum + current, 0) === userRecords.reduce((sum, item) => sum + item.shouldGet, 0) ? '帳目正確' : '帳目有誤'}</p>
+              <p>{userRecords.map((item, index) => {
+                showTotalRef.current += item.shouldGet
+                if (item.shouldGet >= 0) {
+                  return (index === 0 ? '' : ' + ') + Math.abs(item.shouldGet).toString()
+                } else {
+                  return (index === 0 ? '' : ' - ') + Math.abs(item.shouldGet).toString()
+                }
+              })}</p>
+            </div>
+            <div className='mt-2 list-group'>
+              {
+                userRecords.map(item => <div className='list-group-item d-flex flex-column justify-content-start mb-2 bg-light px-1' style={{ minHeight: '5rem', border: 'none' }}>
+                  <p className="fw-bold user-select-none text-nowrap text-start mb-0" style={{ fontSize: '1.1rem', color: '#0d6efd' }}>{item.title}</p>
+                  <p className="text-muted small text-start user-select-none mb-0" style={{ fontSize: '0.8rem' }}>{item.description}</p>
+                  <p className="text-start user-select-none" style={{ fontSize: '0.8rem' }}>
+                    {formatTimestamp(item.createdAt)}
+                  </p>
+                  <p className='fs-4' style={{ backgroundColor: item.shouldGet < 0 ? '#4ade80' : '#f87171' }}>{item.shouldGet < 0 ? '你應付' : '你應得'} {Math.abs(item.shouldGet)}</p>
+                  <div>
+                    {
+                      item.detail.map(itemBody => {
+                        return <div className="d-flex align-items-center justify-content-center mb-4">
+                          <div className="text-center" style={{ width: '4rem' }}>
+                            <img src={getUserInfo(configData.users, itemBody.borrower).photo} style={{ height: '2rem' }} alt="user" />
+                            <p className="m-0" style={{ fontSize: '12px' }}>{getUserInfo(configData.users, itemBody.borrower).name}</p>
+                          </div>
+                          <img src="/arrow.png" style={{ height: '3rem' }} alt="arrow" />
+                          <div className="text-center" style={{ width: '4rem', marginRight: '2rem' }}>
+                            <img src={getUserInfo(configData.users, itemBody.debtor).photo} style={{ height: '2rem' }} alt="user" />
+                            <p className="m-0" style={{ fontSize: '12px' }}>{getUserInfo(configData.users, itemBody.debtor).name}</p>
+                          </div>
+                          <div className="mx-4 d-flex flex-column align-items-center" style={{ width: '6rem' }}>
+                            <p className="m-0 fw-bold fs-5">${numberWithCommas(itemBody.debt)}</p>
+                            <p className="m-0 text-center" style={{ fontSize: '12px' }}>{itemBody.remark}</p>
+                          </div>
+                        </div>
+                      })
+                    }
+                  </div>
                 </div>)
               }
             </div>

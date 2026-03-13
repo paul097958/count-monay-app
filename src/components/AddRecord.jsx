@@ -36,7 +36,7 @@ export default function AddRecord({ addRecordMenuState, setAddRecordMenuState, c
                 debt: isFirstBorrower ? item.debt : -item.debt
             };
         });
-
+        const uniqueUids = [...new Set(newRecords.flatMap(item => [item.first, item.second]))];
         const docRef = doc(db, identity, 'config');
         const historyColRef = collection(db, identity);
 
@@ -57,6 +57,7 @@ export default function AddRecord({ addRecordMenuState, setAddRecordMenuState, c
             // 新增歷史紀錄文件
             const recordDocRef = await addDoc(historyColRef, {
                 ...recordsData,
+                users: uniqueUids,
                 createdAt: serverTimestamp() // 使用 Web 版的 serverTimestamp
             });
 

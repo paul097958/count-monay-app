@@ -28,48 +28,51 @@ export default function SetRecords({ recordMenuState, setRecordMenuState, menu, 
     }, [menu])
 
     const calculateRecordsDiff = (oldRecords, newRecords) => {
-        // 1. 先找出所有在新陣列中被刪除的項目 (舊的有，新的沒有)
-        // 這裡我們假設 index 是比對基準，或者你可以改用 ID 比對
-        const deletedRecords = oldRecords
-            .filter((_, index) => index >= newRecords.length)
-            .map(oldRec => ({
-                remark: `(已刪除) ${oldRec.remark}`,
-                debt: oldRec.debt,
-                borrower: oldRec.debtor, // 角色相反
-                debtor: oldRec.borrower  // 角色相反
-            }));
-
-        // 2. 處理新陣列的 reduce (包含新增與修改)
-        const diffs = newRecords.reduce((diffArray, newRec, index) => {
-            const oldRec = oldRecords[index];
-
-            // --- 情況 1：這是全新的項目 ---
-            if (!oldRec) {
-                return [...diffArray, { ...newRec }];
+        const nameOldRecords = oldRecords.map(item => {
+            const fixOrder = getFixedOrder(item.borrower, item.debtor)
+            const key = `${fixOrder[0]}_${fixOrder[1]}`
+            return {
+                ...item,
+                id: key
             }
-
-            // --- 情況 2：既有項目計算差異 ---
-            const diffAmount = newRec.debt - oldRec.debt;
-            if (diffAmount === 0) return diffArray;
-
-            let resultRecord = {
-                remark: newRec.remark,
-                debt: Math.abs(diffAmount),
-            };
-
-            if (diffAmount < 0) {
-                resultRecord.borrower = oldRec.debtor;
-                resultRecord.debtor = oldRec.borrower;
+        })
+        const nameNewRecords = newRecords.map(item => {
+            const fixOrder = getFixedOrder(item.borrower, item.debtor)
+            const key = `${fixOrder[0]}_${fixOrder[1]}`
+            return {
+                ...item,
+                id: key
+            }
+        })
+        const deleteArray = nameOldRecords.filter(item => nameNewRecords.find(element => element.id === item.id) === undefined)
+            .map(item => ({ ...item, borrower: item.debtor, debtor: item.borrower }))
+        const changeArray = nameOldRecords.filter(item => {
+            if (nameNewRecords.some(element => element.id === item.id)) {
+                const newElement = nameNewRecords.find(element => element.id === item.id)
+                return item.debt !== newElement.debt
             } else {
-                resultRecord.borrower = oldRec.borrower;
-                resultRecord.debtor = oldRec.debtor;
+                return false
             }
+        }).map(item => {
+            const newElement = nameNewRecords.find(element => element.id === item.id)
+            const sub = newElement.debt - item.debt
+            if (sub >= 0) {
+                return {
+                    ...item,
+                    debt: sub
+                }
+            } else {
+                return {
+                    ...item,
+                    borrower: item.debtor,
+                    debtor: item.borrower,
+                    debt: Math.abs(sub)
+                }
+            }
+        })
+        const addArray = nameNewRecords.filter(item => nameOldRecords.find(element => element.id === item.id) === undefined)
+        return [...deleteArray, ...changeArray, ...addArray]
 
-            return [...diffArray, resultRecord];
-        }, []);
-
-        // 3. 合併「變動/新增」與「刪除反轉」的結果
-        return [...diffs, ...deletedRecords];
     };
 
 
@@ -104,14 +107,15 @@ export default function SetRecords({ recordMenuState, setRecordMenuState, menu, 
                 // --- C. 寫入階段 ---
                 // 更新總帳 (原本的 saveDatabaseConfig 部分)
                 transaction.update(docConfigRef, { records: resultRecords });
-
+                const uniqueUids = [...new Set(menuChange.records.flatMap(item => [item.borrower, item.debtor]))];
                 if (isDelete) {
                     transaction.delete(docRecordRef);
                 } else {
                     transaction.update(docRecordRef, {
                         title: menuChange.title,
                         description: menuChange.description,
-                        records: menuChange.records
+                        records: menuChange.records,
+                        users: uniqueUids
                     });
                 }
             });
@@ -132,6 +136,7 @@ export default function SetRecords({ recordMenuState, setRecordMenuState, menu, 
                         <i className="bi bi-x-lg fw-bold fs-6" onClick={() => {
                             setRecordMenuState(false);
                             setMenu({ title: '', description: '', records: [] });
+                            setEditMode(false);
                         }}></i>
                     </div>
                     <p className='fw-light m-0' style={{ fontSize: '12px' }}>在這裡將可以設定明細</p>
@@ -167,7 +172,7 @@ export default function SetRecords({ recordMenuState, setRecordMenuState, menu, 
                                     <p className="m-0" style={{ fontSize: '12px' }}>{getUserInfo(users, item.debtor).name}</p>
                                 </div>
                                 {
-                                    !editMode ? <div className="mx-4 d-flex flex-column align-items-center" style={{width: '6rem'}}>
+                                    !editMode ? <div className="mx-4 d-flex flex-column align-items-center" style={{ width: '6rem' }}>
                                         <p className="m-0 fw-bold fs-5">${numberWithCommas(item.debt)}</p>
                                         <p className="m-0 text-center" style={{ fontSize: '12px' }}>{item.remark}</p>
                                     </div> : ''
@@ -282,6 +287,9 @@ export default function SetRecords({ recordMenuState, setRecordMenuState, menu, 
                             <button className="btn btn-warning btn-sm" onClick={async () => {
                                 if (!firstRef.current) return
                                 firstRef.current = false
+                                if (menuChange.records.length === 0) return alert('請至少新增一筆紀錄')
+                                if (menuChange.title.trim() === '') return alert('請填寫標題')
+                                if (menuChange.description.trim() === '') return alert('請填寫描述')
                                 await saveDatabaseCombined(calculateRecordsDiff(menu.records, menuChange.records))
                                 await getConfigData()// section1
                                 await getRecentRecords()// section2
