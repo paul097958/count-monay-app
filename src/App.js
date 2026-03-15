@@ -209,6 +209,8 @@ function App() {
     return str.length > maxLength ? str.slice(0, maxLength) + '...' : str;
   };
 
+
+
   useEffect(() => {
     // 1. 先防擋重複執行，放在最前面
     if (firstRef.current) {
@@ -223,7 +225,7 @@ function App() {
       return;
     }
 
-    liff.init({ liffId: LINE_LIFF })
+    liff.init({ liffId: LINE_LIFF, scope: ['profile', 'chat_message.write'] })
       .then(async () => {
         // 3. 檢查登入狀態
         if (!liff.isLoggedIn()) {
@@ -293,6 +295,7 @@ function App() {
         userInfo={userInfo}
         getConfigData={getConfigData}
         getRecentRecords={getRecentRecords}
+        users={configData.users}
       />
       <SetRecords
         recordMenuState={recordMenuState}
@@ -314,7 +317,7 @@ function App() {
         <div className="container-fluid">
           <a className="navbar-brand d-flex align-items-center gap-3" href="#">
             <img src="/logo.jpg" alt="Logo" height="35" className="d-inline-block align-text-top" />
-            <span className='fs-5'>算錢工具 v0.1.2</span>
+            <span className='fs-5'>算錢工具 v0.1.3</span>
           </a>
         </div>
       </nav>
@@ -322,7 +325,7 @@ function App() {
         <div className='m-3'>
           <div className='bg-light rounded border p-2 shadow shadow-sm'>
             <div className='text-start'>
-              <p className='fs-6 fw-medium mb-0'>欠款專區</p>
+              <p className='fs-4 fw-medium mb-0'>欠款專區</p>
               <p className='fw-light m-0' style={{ fontSize: '12px' }}>紅色為欠你錢、綠色為你欠別人錢</p>
               <div className='mt-2 d-flex flex-wrap gap-2'>
                 {debtData.filter(item => item.debt !== 0).map(item => <img src={item.photo || '/gray-icon.png'} alt={item.name} className='rounded shadow-sm border' style={{ height: '2rem' }} />)}
@@ -336,7 +339,7 @@ function App() {
           </div>
           <div className='bg-light rounded border p-2 shadow shadow-sm mt-2'>
             <div className='text-start'>
-              <p className='fs-6 fw-medium mb-0'>明細專區</p>
+              <p className='fs-4 fw-medium mb-0'>明細專區</p>
               <p className='fw-light m-0' style={{ fontSize: '12px' }}>在這裡將顯示所有交易的明細紀錄</p>
             </div>
             <button className='btn btn-outline-primary w-100 mt-2' onClick={() => {
@@ -364,23 +367,27 @@ function App() {
             </div>
             <div>
               {
-                hasMore ? <i className="bi bi-plus-circle-fill fs-3" onClick={async () => {
+                hasMore ? <button className="fs-6 btn btn-link p-0" type="button" onClick={async () => {
                   await getNextData()
-                }}></i> : ''
+                }}>加載更多...</button> : ''
               }
             </div>
           </div>
           <div className='bg-light rounded border p-2 shadow shadow-sm mt-2'>
             <div className='text-start'>
-              <p className='fs-6 fw-medium mb-0'>帳目詳情</p>
+              <p className='fs-4 fw-medium mb-0'>帳目詳情</p>
               <p className='fw-light m-0' style={{ fontSize: '12px' }}>在這裡將顯示所有欠款與還款詳情</p>
             </div>
-            <button className={`btn btn-outline-secondary mt-2 w-100 ${userRecords.length !== 0 ? 'd-none' : ''}`} onClick={async () => {
-              await getDocsByUserId()
-            }}>取得我的所有帳目</button>
-            <div className='text-start mt-2'>
-              <p className={`fw-bold mb-0 ${userRecords.length === 0 ? 'd-none' : ''}`}>總金額: {userRecords.reduce((sum, item) => sum + item.shouldGet, 0)}</p>
-              <p className={userRecords.length === 0 ? 'd-none' : ''}>{debtData
+            <button
+              className={`btn btn-link mt-2 w-100 ${userRecords.length !== 0 ? 'd-none' : ''}`}
+              type="button"
+              onClick={async () => {
+                await getDocsByUserId()
+              }}
+            >取得帳目</button>
+            <div className={`text-start mt-2 ${userRecords.length === 0 ? 'd-none' : 'd-block'}`}>
+              <p className={`mb-0 d-flex align-items-center ${userRecords.length === 0 ? 'd-none' : ''}`}>你{userRecords.reduce((sum, item) => sum + item.shouldGet, 0) >= 0 ? '應得' : '應付'}<strong className='fs-1 mx-1'>{userRecords.reduce((sum, item) => sum + item.shouldGet, 0)}</strong></p>
+              <p className={userRecords.length === 0 ? 'd-none' : `fw-bold border p-1 text-center rounded shadow-sm mt-2 mb-3 ${userRecords.reduce((sum, item) => sum + item.shouldGet, 0) ? 'bg-success-subtle' : 'bg-danger-subtle'}`}>{debtData
                 .filter(item => item.debt !== 0)
                 .map(item => item.debt)
                 .reduce((sum, current) => sum + current, 0) === userRecords.reduce((sum, item) => sum + item.shouldGet, 0) ? '帳目正確' : '帳目有誤'}</p>
@@ -389,11 +396,11 @@ function App() {
                 if (item.shouldGet >= 0) {
                   return (index === 0 ? '' : ' + ') + Math.abs(item.shouldGet).toString()
                 } else {
-                  return (index === 0 ? '' : ' - ') + Math.abs(item.shouldGet).toString()
+                  return ' - ' + Math.abs(item.shouldGet).toString()
                 }
               })}</p>
             </div>
-            <div className='mt-2 list-group'>
+            <div className={`list-group mt-2 ${userRecords.length === 0 ? 'd-none' : ''}`}>
               {
                 userRecords.map(item => <div className='list-group-item d-flex flex-column justify-content-start mb-2 bg-light px-1' style={{ minHeight: '5rem', border: 'none' }}>
                   <p className="fw-bold user-select-none text-nowrap text-start mb-0" style={{ fontSize: '1.1rem', color: '#0d6efd' }}>{item.title}</p>

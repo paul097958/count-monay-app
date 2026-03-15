@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import {
     doc,
     addDoc,
@@ -8,9 +8,9 @@ import {
 } from "firebase/firestore";
 import { db } from '../config.js';
 import { updateRecordDebt, updateRecordRemark, deleteRecord, getUserInfo, checkConflict, getFixedOrder, mergeDebtArrays, numberWithCommas } from "../common/RecordFunction.js";
+import sendMessage from "../common/SendMessage.js";
 
-
-export default function AddRecord({ addRecordMenuState, setAddRecordMenuState, configData, userInfo, getConfigData, getRecentRecords }) {
+export default function AddRecord({ addRecordMenuState, setAddRecordMenuState, configData, userInfo, getConfigData, getRecentRecords, users }) {
 
     const [addBorrower, setAddBorrower] = useState('')
     const [addDebtor, setAddDebtor] = useState('')
@@ -25,7 +25,7 @@ export default function AddRecord({ addRecordMenuState, setAddRecordMenuState, c
 
 
     async function saveDatabase(recordsData, identity) {
-        const newRecords = recordsData.records.map(item => {
+        const newRecordsArray = recordsData.records.map(item => {
             // 假設 getFixedOrder 已經在外部定義好
             let userOrder = getFixedOrder(item.borrower, item.debtor);
             const isFirstBorrower = item.borrower === userOrder[0];
@@ -36,7 +36,7 @@ export default function AddRecord({ addRecordMenuState, setAddRecordMenuState, c
                 debt: isFirstBorrower ? item.debt : -item.debt
             };
         });
-        const uniqueUids = [...new Set(newRecords.flatMap(item => [item.first, item.second]))];
+        const uniqueUids = [...new Set(newRecordsArray.flatMap(item => [item.first, item.second]))];
         const docRef = doc(db, identity, 'config');
         const historyColRef = collection(db, identity);
 
@@ -49,7 +49,7 @@ export default function AddRecord({ addRecordMenuState, setAddRecordMenuState, c
                 }
 
                 const oldRecords = sfDoc.data().records || [];
-                const resultRecords = mergeDebtArrays(oldRecords, newRecords);
+                const resultRecords = mergeDebtArrays(oldRecords, newRecordsArray);
 
                 transaction.update(docRef, { records: resultRecords });
             });
@@ -60,6 +60,8 @@ export default function AddRecord({ addRecordMenuState, setAddRecordMenuState, c
                 users: uniqueUids,
                 createdAt: serverTimestamp() // 使用 Web 版的 serverTimestamp
             });
+            sendMessage(userInfo.current.name, userInfo.current.picture, newRecords.title, newRecords.description, [], newRecords.records, '新增', users)
+
 
             console.log("新文件已建立，ID 為:", recordDocRef.id);
         } catch (e) {

@@ -10,6 +10,7 @@ import {
 } from "firebase/firestore";
 import { db } from '../config.js';
 import { updateRecordDebt, updateRecordRemark, deleteRecord, getUserInfo, checkConflict, getFixedOrder, mergeDebtArrays, numberWithCommas } from "../common/RecordFunction.js";
+import sendMessage from "../common/SendMessage.js";
 
 export default function SetRecords({ recordMenuState, setRecordMenuState, menu, setMenu, users, userInfo, getConfigData, getRecentRecords }) {
 
@@ -96,8 +97,12 @@ export default function SetRecords({ recordMenuState, setRecordMenuState, menu, 
             await runTransaction(db, async (transaction) => {
                 // --- A. 讀取階段 (所有的 Get 必須在 Update 之前) ---
                 const configDoc = await transaction.get(docConfigRef);
+                const recordDoc = await transaction.get(docRecordRef);
                 if (!configDoc.exists()) {
                     throw new Error('Config 文件不存在！');
+                }
+                if (!recordDoc.exists()) {
+                    throw new Error('Record 文件不存在！');
                 }
 
                 // --- B. 計算階段 ---
@@ -108,9 +113,14 @@ export default function SetRecords({ recordMenuState, setRecordMenuState, menu, 
                 // 更新總帳 (原本的 saveDatabaseConfig 部分)
                 transaction.update(docConfigRef, { records: resultRecords });
                 const uniqueUids = [...new Set(menuChange.records.flatMap(item => [item.borrower, item.debtor]))];
+                const recordData = recordDoc.data().records
                 if (isDelete) {
+                    sendMessage(userInfo.current.name, userInfo.current.picture, menuChange.title, menuChange.description, [], recordData, '刪除', users)
                     transaction.delete(docRecordRef);
                 } else {
+                    if (recordData !== menuChange.records) {
+                        sendMessage(userInfo.current.name, userInfo.current.picture, menuChange.title, menuChange.description, recordData, menuChange.records, '更改', users)
+                    }
                     transaction.update(docRecordRef, {
                         title: menuChange.title,
                         description: menuChange.description,
