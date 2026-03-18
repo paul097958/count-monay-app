@@ -60,7 +60,7 @@ export default function AddRecord({ addRecordMenuState, setAddRecordMenuState, c
                 users: uniqueUids,
                 createdAt: serverTimestamp() // 使用 Web 版的 serverTimestamp
             });
-            sendMessage(userInfo.current.name, userInfo.current.picture, newRecords.title, newRecords.description, [], newRecords.records, '新增', users)
+            sendMessage(userInfo.current.name, userInfo.current.picture, newRecords.title, newRecords.description, [], newRecords.records, '新增', users, userInfo)
 
 
             console.log("新文件已建立，ID 為:", recordDocRef.id);
@@ -210,6 +210,7 @@ export default function AddRecord({ addRecordMenuState, setAddRecordMenuState, c
                         alert('紀錄新增成功')
                         setNewRecords({ title: '', description: '', records: [] })
                         setAddRecordMenuState(false)
+                        setEditMode(false)
                         await getConfigData()// section1
                         await getRecentRecords()// section2
                         firstRef.current = true

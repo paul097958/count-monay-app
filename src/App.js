@@ -317,7 +317,7 @@ function App() {
         <div className="container-fluid">
           <a className="navbar-brand d-flex align-items-center gap-3" href="#">
             <img src="/logo.jpg" alt="Logo" height="35" className="d-inline-block align-text-top" />
-            <span className='fs-5'>算錢工具 v0.1.3</span>
+            <span className='fs-5'>算錢工具 v0.1.4</span>
           </a>
         </div>
       </nav>
@@ -386,7 +386,7 @@ function App() {
               }}
             >取得帳目</button>
             <div className={`text-start mt-2 ${userRecords.length === 0 ? 'd-none' : 'd-block'}`}>
-              <p className={`mb-0 d-flex align-items-center ${userRecords.length === 0 ? 'd-none' : ''}`}>你{userRecords.reduce((sum, item) => sum + item.shouldGet, 0) >= 0 ? '應得' : '應付'}<strong className='fs-1 mx-1'>{userRecords.reduce((sum, item) => sum + item.shouldGet, 0)}</strong></p>
+              <p className={`mb-0 d-flex align-items-center ${userRecords.length === 0 ? 'd-none' : ''}`}>你{userRecords.reduce((sum, item) => sum + item.shouldGet, 0) >= 0 ? '應得' : '應付'}<strong className='fs-1 mx-1'>{Math.abs(userRecords.reduce((sum, item) => sum + item.shouldGet, 0))}</strong></p>
               <p className={userRecords.length === 0 ? 'd-none' : `fw-bold border p-1 text-center rounded shadow-sm mt-2 mb-3 ${userRecords.reduce((sum, item) => sum + item.shouldGet, 0) ? 'bg-success-subtle' : 'bg-danger-subtle'}`}>{debtData
                 .filter(item => item.debt !== 0)
                 .map(item => item.debt)

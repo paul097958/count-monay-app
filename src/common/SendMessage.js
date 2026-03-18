@@ -1,200 +1,99 @@
 import liff from "@line/liff";
 import { getUserInfo, numberWithCommas } from "./RecordFunction";
+import { LINE_LIFF, APP_URL } from "../config";
 
-export default async function sendMessage(senderName, senderPhoto, title = '', description = '', origin, change, method, users) {
+export default async function sendMessage(senderName = '未命名', senderPhoto = '/gray-icon.png', title = '', description = '', origin, change, method, users, userInfo) {
 
-    function originArrayMixer() {
-        if (method === '新增' || method === '刪除') {
-            return [...originArray]
-        } else if (method === '更改') {
-            return [
-                {
-                    "type": "text",
-                    "text": "原先資料",
-                    "size": "md",
-                    "color": "#4F4F4F",
-                    "margin": "lg"
-                }, ...originArray, {
-                    "type": "separator",
-                    "margin": "lg"
-                },]
-        }
+    function contentMapper(array = []) {
+        return array.map(item => {
+            return {
+                "type": "box",
+                "layout": "horizontal",
+                "contents": [
+                    {
+                        "type": "box",
+                        "layout": "vertical",
+                        "contents": [
+                            {
+                                "type": "text",
+                                "text": "$" + numberWithCommas(item.debt.toString()),
+                                "weight": "bold",
+                                "size": "xl"
+                            },
+                            {
+                                "type": "text",
+                                "text": item.remark,
+                                "size": "md",
+                                "color": "#9D9D9D",
+                                "gravity": "center",
+                                "wrap": true
+                            }
+                        ],
+                        "margin": "xs",
+                        "spacing": "sm",
+                        "justifyContent": "center",
+                        "alignItems": "center",
+                        "flex": 2
+                    },
+                    {
+                        "type": "box",
+                        "layout": "horizontal",
+                        "contents": [
+                            {
+                                "type": "box",
+                                "layout": "vertical",
+                                "contents": [
+                                    {
+                                        "type": "image",
+                                        "url": getUserInfo(users, item.borrower).photo,
+                                        "size": "40px",
+                                        "aspectMode": "fit"
+                                    },
+                                    {
+                                        "type": "text",
+                                        "text": getUserInfo(users, item.borrower).name,
+                                        "align": "center",
+                                        "size": "xxs",
+                                        "wrap": true
+                                    }
+                                ]
+                            },
+                            {
+                                "type": "image",
+                                "url": `${APP_URL}/arrow.png`,
+                                "size": "35px",
+                                "aspectMode": "fit"
+                            },
+                            {
+                                "type": "box",
+                                "layout": "vertical",
+                                "contents": [
+                                    {
+                                        "type": "image",
+                                        "url": getUserInfo(users, item.debtor).photo,
+                                        "size": "40px",
+                                        "aspectMode": "fit"
+                                    },
+                                    {
+                                        "type": "text",
+                                        "text": getUserInfo(users, item.debtor).name,
+                                        "align": "center",
+                                        "size": "xxs",
+                                        "wrap": true
+                                    }
+                                ]
+                            }
+                        ],
+                        "alignItems": "center",
+                        "flex": 3,
+                        "paddingAll": "md"
+                    }
+                ]
+            }
+        })
     }
-    const originArray = (origin || []).map(item => {
-        return {
-            "type": "box",
-            "layout": "horizontal",
-            "contents": [
-                {
-                    "type": "box",
-                    "layout": "vertical",
-                    "contents": [
-                        {
-                            "type": "text",
-                            "text": "$" + numberWithCommas(item.debt.toString()),
-                            "weight": "bold",
-                            "size": "xl"
-                        },
-                        {
-                            "type": "text",
-                            "text": item.remark,
-                            "size": "md",
-                            "color": "#9D9D9D",
-                            "gravity": "center",
-                            "wrap": true
-                        }
-                    ],
-                    "margin": "xs",
-                    "spacing": "sm",
-                    "justifyContent": "center",
-                    "alignItems": "center",
-                    "flex": 2
-                },
-                {
-                    "type": "box",
-                    "layout": "horizontal",
-                    "contents": [
-                        {
-                            "type": "box",
-                            "layout": "vertical",
-                            "contents": [
-                                {
-                                    "type": "image",
-                                    "url": getUserInfo(users, item.borrower).photo,
-                                    "size": "40px",
-                                    "aspectMode": "fit"
-                                },
-                                {
-                                    "type": "text",
-                                    "text": getUserInfo(users, item.borrower).name,
-                                    "align": "center",
-                                    "size": "xxs",
-                                    "wrap": true
-                                }
-                            ]
-                        },
-                        {
-                            "type": "image",
-                            "url": "https://firebasestorage.googleapis.com/v0/b/count-money-579c7.firebasestorage.app/o/line-images%2F%E2%80%94Pngtree%E2%80%94right%20arrow%20glyph%20black%20icon_3755432.png?alt=media&token=114b5130-0519-4982-bda7-60a9dd9d64d1",
-                            "size": "35px",
-                            "aspectMode": "fit"
-                        },
-                        {
-                            "type": "box",
-                            "layout": "vertical",
-                            "contents": [
-                                {
-                                    "type": "image",
-                                    "url": getUserInfo(users, item.debtor).photo,
-                                    "size": "40px",
-                                    "aspectMode": "fit"
-                                },
-                                {
-                                    "type": "text",
-                                    "text": getUserInfo(users, item.debtor).name,
-                                    "align": "center",
-                                    "size": "xxs",
-                                    "wrap": true
-                                }
-                            ]
-                        }
-                    ],
-                    "alignItems": "center",
-                    "flex": 2,
-                    "paddingAll": "md"
-                }
-            ]
-        }
-    })
 
-    const changeArray = (change || []).map(item => {
-        return {
-            "type": "box",
-            "layout": "horizontal",
-            "contents": [
-                {
-                    "type": "box",
-                    "layout": "vertical",
-                    "contents": [
-                        {
-                            "type": "text",
-                            "text": "$" + numberWithCommas(item.debt.toString()),
-                            "weight": "bold",
-                            "size": "xl"
-                        },
-                        {
-                            "type": "text",
-                            "text": item.remark,
-                            "size": "md",
-                            "color": "#9D9D9D",
-                            "gravity": "center",
-                            "wrap": true
-                        }
-                    ],
-                    "margin": "xs",
-                    "spacing": "sm",
-                    "justifyContent": "center",
-                    "alignItems": "center",
-                    "flex": 2
-                },
-                {
-                    "type": "box",
-                    "layout": "horizontal",
-                    "contents": [
-                        {
-                            "type": "box",
-                            "layout": "vertical",
-                            "contents": [
-                                {
-                                    "type": "image",
-                                    "url": getUserInfo(users, item.borrower).photo,
-                                    "size": "40px",
-                                    "aspectMode": "fit"
-                                },
-                                {
-                                    "type": "text",
-                                    "text": getUserInfo(users, item.borrower).name,
-                                    "align": "center",
-                                    "size": "xxs",
-                                    "wrap": true
-                                }
-                            ]
-                        },
-                        {
-                            "type": "image",
-                            "url": "https://firebasestorage.googleapis.com/v0/b/count-money-579c7.firebasestorage.app/o/line-images%2F%E2%80%94Pngtree%E2%80%94right%20arrow%20glyph%20black%20icon_3755432.png?alt=media&token=114b5130-0519-4982-bda7-60a9dd9d64d1",
-                            "size": "35px",
-                            "aspectMode": "fit"
-                        },
-                        {
-                            "type": "box",
-                            "layout": "vertical",
-                            "contents": [
-                                {
-                                    "type": "image",
-                                    "url": getUserInfo(users, item.debtor).photo,
-                                    "size": "40px",
-                                    "aspectMode": "fit"
-                                },
-                                {
-                                    "type": "text",
-                                    "text": getUserInfo(users, item.debtor).name,
-                                    "align": "center",
-                                    "size": "xxs",
-                                    "wrap": true
-                                }
-                            ]
-                        }
-                    ],
-                    "alignItems": "center",
-                    "flex": 2,
-                    "paddingAll": "md"
-                }
-            ]
-        }
-    })
-
-    const billChangeCard = {
+    const billAddCard = {
         "type": "bubble",
         "header": {
             "type": "box",
@@ -202,9 +101,9 @@ export default async function sendMessage(senderName, senderPhoto, title = '', d
             "contents": [
                 {
                     "type": "text",
-                    "text": `帳單${method}`,
-                    "color": "#E0E0E0",
-                    "size": "md"
+                    "text": "帳單新增",
+                    "size": "md",
+                    "color": "#E0E0E0"
                 }
             ]
         },
@@ -218,65 +117,68 @@ export default async function sendMessage(senderName, senderPhoto, title = '', d
                     "contents": [
                         {
                             "type": "box",
-                            "layout": "vertical",
+                            "layout": "horizontal",
                             "contents": [
                                 {
-                                    "type": "image",
-                                    "url": senderPhoto,
-                                    "size": "30px",
-                                    "aspectMode": "fit"
+                                    "type": "box",
+                                    "layout": "vertical",
+                                    "contents": [
+                                        {
+                                            "type": "image",
+                                            "url": senderPhoto,
+                                            "size": "40px",
+                                            "aspectMode": "fit"
+                                        },
+                                        {
+                                            "type": "text",
+                                            "text": senderName,
+                                            "align": "center",
+                                            "size": "xxs",
+                                            "wrap": true
+                                        }
+                                    ],
+                                    "flex": 1
                                 },
                                 {
                                     "type": "text",
-                                    "text": senderName,
+                                    "size": "xs",
                                     "align": "center",
-                                    "size": "xxs",
-                                    "wrap": true
+                                    "flex": 1,
+                                    "margin": "none",
+                                    "color": "#3C3C3C",
+                                    "text": "新增"
                                 }
                             ],
-                            "flex": 2
+                            "flex": 1,
+                            "alignItems": "center"
                         },
                         {
-                            "type": "text",
-                            "text": method,
-                            "wrap": true,
-                            "size": "md",
-                            "weight": "regular",
-                            "align": "center",
+                            "type": "box",
+                            "layout": "vertical",
+                            "contents": [
+                                {
+                                    "type": "text",
+                                    "wrap": false,
+                                    "size": "xl",
+                                    "weight": "bold",
+                                    "text": title
+                                },
+                                {
+                                    "type": "text",
+                                    "text": description,
+                                    "size": "16px",
+                                    "color": "#9D9D9D"
+                                }
+                            ],
                             "flex": 2,
-                            "margin": "none"
-                        },
-                        {
-                            "type": "text",
-                            "wrap": false,
-                            "size": "xl",
-                            "color": "#6C6C6C",
-                            "flex": 6,
-                            "weight": "bold",
-                            "offsetStart": "xs",
-                            "text": `${title} 的帳目`
+                            "paddingStart": "sm"
                         }
                     ],
                     "alignItems": "center",
-                    "justifyContent": "space-between"
+                    "justifyContent": "center",
+                    "paddingBottom": "xl"
                 },
-                {
-                    "type": "text",
-                    "text": description,
-                    "color": "#ADADAD",
-                    "size": "16px",
-                    "wrap": false,
-                    "margin": "sm"
-                },
-                ...originArrayMixer(),
-                {
-                    "type": "text",
-                    "text": method === '刪除' ? "原先資料" : "更改資料",
-                    "size": "md",
-                    "color": "#4F4F4F",
-                    "margin": "lg"
-                },
-                ...changeArray
+                ...contentMapper(change)
             ]
         },
         "footer": {
@@ -291,7 +193,7 @@ export default async function sendMessage(senderName, senderPhoto, title = '', d
                     "action": {
                         "type": "uri",
                         "label": "更改",
-                        "uri": "https://line.me/"
+                        "uri": `https://liff.line.me/${LINE_LIFF}/?g=${userInfo.current.groupId}`
                     }
                 }
             ]
@@ -301,17 +203,274 @@ export default async function sendMessage(senderName, senderPhoto, title = '', d
                 "backgroundColor": "#004B97"
             }
         }
-    };
+    }
+
+
+    const billDeleteCard = {
+        "type": "bubble",
+        "header": {
+            "type": "box",
+            "layout": "vertical",
+            "contents": [
+                {
+                    "type": "text",
+                    "text": "帳單刪除",
+                    "size": "md"
+                }
+            ]
+        },
+        "body": {
+            "type": "box",
+            "layout": "vertical",
+            "contents": [
+                {
+                    "type": "box",
+                    "layout": "horizontal",
+                    "contents": [
+                        {
+                            "type": "box",
+                            "layout": "horizontal",
+                            "contents": [
+                                {
+                                    "type": "box",
+                                    "layout": "vertical",
+                                    "contents": [
+                                        {
+                                            "type": "image",
+                                            "url": senderPhoto,
+                                            "size": "40px",
+                                            "aspectMode": "fit"
+                                        },
+                                        {
+                                            "type": "text",
+                                            "text": senderName,
+                                            "align": "center",
+                                            "size": "xxs",
+                                            "wrap": true
+                                        }
+                                    ],
+                                    "flex": 1
+                                },
+                                {
+                                    "type": "text",
+                                    "text": "刪除",
+                                    "size": "xs",
+                                    "align": "center",
+                                    "flex": 1,
+                                    "margin": "none",
+                                    "color": "#3C3C3C"
+                                }
+                            ],
+                            "flex": 1,
+                            "alignItems": "center"
+                        },
+                        {
+                            "type": "box",
+                            "layout": "vertical",
+                            "contents": [
+                                {
+                                    "type": "text",
+                                    "wrap": false,
+                                    "size": "xl",
+                                    "weight": "bold",
+                                    "text": title
+                                },
+                                {
+                                    "type": "text",
+                                    "text": description,
+                                    "size": "16px",
+                                    "color": "#9D9D9D"
+                                }
+                            ],
+                            "flex": 2,
+                            "paddingStart": "sm"
+                        }
+                    ],
+                    "alignItems": "center",
+                    "justifyContent": "center",
+                    "paddingBottom": "xl"
+                },
+                ...contentMapper(origin)
+            ]
+        },
+        "footer": {
+            "type": "box",
+            "layout": "vertical",
+            "spacing": "sm",
+            "contents": [
+                {
+                    "type": "button",
+                    "style": "link",
+                    "height": "sm",
+                    "action": {
+                        "type": "uri",
+                        "label": "更改",
+                        "uri": `https://liff.line.me/${LINE_LIFF}/?g=${userInfo.current.groupId}`
+                    }
+                }
+            ]
+        },
+        "styles": {
+            "header": {
+                "backgroundColor": "#FF8000"
+            }
+        }
+    }
+
+
+    const billChangeCard = {
+        "type": "bubble",
+        "header": {
+            "type": "box",
+            "layout": "vertical",
+            "contents": [
+                {
+                    "type": "text",
+                    "text": "帳單更改",
+                    "size": "md"
+                }
+            ]
+        },
+        "body": {
+            "type": "box",
+            "layout": "vertical",
+            "contents": [
+                {
+                    "type": "box",
+                    "layout": "horizontal",
+                    "contents": [
+                        {
+                            "type": "box",
+                            "layout": "horizontal",
+                            "contents": [
+                                {
+                                    "type": "box",
+                                    "layout": "vertical",
+                                    "contents": [
+                                        {
+                                            "type": "image",
+                                            "url": senderPhoto,
+                                            "size": "40px",
+                                            "aspectMode": "fit"
+                                        },
+                                        {
+                                            "type": "text",
+                                            "text": senderName,
+                                            "align": "center",
+                                            "size": "xxs",
+                                            "wrap": true
+                                        }
+                                    ],
+                                    "flex": 1
+                                },
+                                {
+                                    "type": "text",
+                                    "text": "更改",
+                                    "size": "xs",
+                                    "align": "center",
+                                    "flex": 1,
+                                    "margin": "none",
+                                    "color": "#3C3C3C"
+                                }
+                            ],
+                            "flex": 1,
+                            "alignItems": "center"
+                        },
+                        {
+                            "type": "box",
+                            "layout": "vertical",
+                            "contents": [
+                                {
+                                    "type": "text",
+                                    "wrap": false,
+                                    "size": "xl",
+                                    "weight": "bold",
+                                    "text": title
+                                },
+                                {
+                                    "type": "text",
+                                    "text": description,
+                                    "size": "16px",
+                                    "color": "#9D9D9D"
+                                }
+                            ],
+                            "flex": 2,
+                            "paddingStart": "sm"
+                        }
+                    ],
+                    "alignItems": "center",
+                    "justifyContent": "center",
+                    "paddingBottom": "xl"
+                },
+                ...contentMapper(origin),
+                {
+                    "type": "box",
+                    "layout": "horizontal",
+                    "contents": [
+                        {
+                            "type": "image",
+                            "url": `${APP_URL}/arrow-down.png`,
+                            "size": "xxs",
+                            "aspectMode": "fit"
+                        }
+                    ],
+                    "margin": "lg",
+                    "paddingTop": "sm",
+                    "paddingBottom": "sm",
+                    "paddingStart": "md",
+                    "paddingEnd": "sm",
+                    "alignItems": "center"
+                },
+                ...contentMapper(change)
+            ]
+        },
+        "footer": {
+            "type": "box",
+            "layout": "vertical",
+            "spacing": "sm",
+            "contents": [
+                {
+                    "type": "button",
+                    "style": "link",
+                    "height": "sm",
+                    "action": {
+                        "type": "uri",
+                        "label": "更改",
+                        "uri": `https://liff.line.me/${LINE_LIFF}/?g=${userInfo.current.groupId}`
+                    }
+                }
+            ]
+        },
+        "styles": {
+            "header": {
+                "backgroundColor": "#FFE153"
+            }
+        }
+    }
+
+    function contentLoader() {
+        switch (method) {
+            case '新增':
+                return billAddCard
+            case '刪除':
+                return billDeleteCard
+            case '更改':
+                return billChangeCard
+            default:
+                return undefined
+        }
+    }
+
     try {
         await liff.sendMessages([
             {
                 type: 'flex',
-                altText: '帳目變更/新增',
-                contents: billChangeCard
+                altText: '帳目明細',
+                contents: contentLoader()
             }
         ])
     } catch (e) {
-        console.log(e)
+        console.log(e);
     }
 
 

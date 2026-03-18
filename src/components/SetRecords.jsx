@@ -73,7 +73,6 @@ export default function SetRecords({ recordMenuState, setRecordMenuState, menu, 
         })
         const addArray = nameNewRecords.filter(item => nameOldRecords.find(element => element.id === item.id) === undefined)
         return [...deleteArray, ...changeArray, ...addArray]
-
     };
 
 
@@ -84,7 +83,7 @@ export default function SetRecords({ recordMenuState, setRecordMenuState, menu, 
         const docRecordRef = doc(db, userInfo.current.groupId, menuChange.id);
 
         // 1. 預處理資料 (在 Transaction 外處理以保持交易簡潔)
-        const newRecords = recordsData.map(item => {
+        const newRecordsArray = recordsData.map(item => {
             let userOrder = getFixedOrder(item.borrower, item.debtor);
             return {
                 first: userOrder[0],
@@ -107,7 +106,7 @@ export default function SetRecords({ recordMenuState, setRecordMenuState, menu, 
 
                 // --- B. 計算階段 ---
                 const oldRecords = configDoc.data().records || [];
-                const resultRecords = mergeDebtArrays(oldRecords, newRecords);
+                const resultRecords = mergeDebtArrays(oldRecords, newRecordsArray);
 
                 // --- C. 寫入階段 ---
                 // 更新總帳 (原本的 saveDatabaseConfig 部分)
@@ -115,12 +114,10 @@ export default function SetRecords({ recordMenuState, setRecordMenuState, menu, 
                 const uniqueUids = [...new Set(menuChange.records.flatMap(item => [item.borrower, item.debtor]))];
                 const recordData = recordDoc.data().records
                 if (isDelete) {
-                    sendMessage(userInfo.current.name, userInfo.current.picture, menuChange.title, menuChange.description, [], recordData, '刪除', users)
+                    sendMessage(userInfo.current.name, userInfo.current.picture, menuChange.title, menuChange.description, recordData, [], '刪除', users, userInfo)
                     transaction.delete(docRecordRef);
                 } else {
-                    if (recordData !== menuChange.records) {
-                        sendMessage(userInfo.current.name, userInfo.current.picture, menuChange.title, menuChange.description, recordData, menuChange.records, '更改', users)
-                    }
+                    sendMessage(userInfo.current.name, userInfo.current.picture, menuChange.title, menuChange.description, recordData, menuChange.records, '更改', users, userInfo)
                     transaction.update(docRecordRef, {
                         title: menuChange.title,
                         description: menuChange.description,
@@ -291,6 +288,7 @@ export default function SetRecords({ recordMenuState, setRecordMenuState, menu, 
                                 await getRecentRecords()// section2
                                 alert('紀錄已刪除')
                                 setRecordMenuState(false)
+                                setEditMode(false)
                                 setMenu({ title: '', description: '', records: [] })
                                 firstRef.current = true
                             }}>刪除明細</button>
@@ -305,6 +303,7 @@ export default function SetRecords({ recordMenuState, setRecordMenuState, menu, 
                                 await getRecentRecords()// section2
                                 alert('紀錄已更新')
                                 setRecordMenuState(false)
+                                setEditMode(false)
                                 setMenu({ title: '', description: '', records: [] })
                                 firstRef.current = true
                             }}>確認更改</button>
