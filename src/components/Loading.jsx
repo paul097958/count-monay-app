@@ -1,7 +1,10 @@
 import { ClipLoader } from 'react-spinners'
+import { useContext } from 'react'
+import { AppContext } from '../common/Reducer.js'
 
-export default function Loading({ loading }) {
-  if (loading)
+export default function Loading() {
+  const context = useContext(AppContext)
+  if (context.state.loading)
     return (
       <div
         className="d-flex align-items-center justify-content-center"
@@ -15,7 +18,13 @@ export default function Loading({ loading }) {
           zIndex: 999,
         }}
       >
-        <ClipLoader color="#000" loading={loading} size={150} aria-label="Loading Spinner" data-testid="loader" />
+        <ClipLoader
+          color="#000"
+          loading={context.state.loading}
+          size={150}
+          aria-label="Loading Spinner"
+          data-testid="loader"
+        />
       </div>
     )
   else return <></>

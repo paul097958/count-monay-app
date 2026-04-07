@@ -1,5 +1,5 @@
 import liff from '@line/liff'
-import { getUserInfo, numberWithCommas } from './RecordFunction'
+import { getUserInfo, numberWithCommas } from './FunctionBase'
 import { LINE_LIFF, APP_URL } from '../config'
 
 export default async function sendMessage(

@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useContext } from 'react'
 import { doc, addDoc, collection, runTransaction, serverTimestamp } from 'firebase/firestore'
 import { db } from '../config.js'
 import {
@@ -10,18 +10,12 @@ import {
   getFixedOrder,
   mergeDebtArrays,
   numberWithCommas,
-} from '../common/RecordFunction.js'
+} from '../common/FunctionBase.js'
 import sendMessage from '../common/SendMessage.js'
+import { AppContext } from '../common/Reducer.js'
 
-export default function AddRecord({
-  addRecordMenuState,
-  setAddRecordMenuState,
-  configData,
-  userInfo,
-  getConfigData,
-  getRecentRecords,
-  users,
-}) {
+export default function AddRecord({ getConfigData, getRecentRecords }) {
+  const context = useContext(AppContext)
   const [addBorrower, setAddBorrower] = useState('')
   const [addDebtor, setAddDebtor] = useState('')
   const [addDebt, setAddDebt] = useState(0)
@@ -72,15 +66,15 @@ export default function AddRecord({
         createdAt: serverTimestamp(), // 使用 Web 版的 serverTimestamp
       })
       sendMessage(
-        userInfo.current.name,
-        userInfo.current.picture,
+        context.userInfo.current.name,
+        context.userInfo.current.picture,
         newRecords.title,
         newRecords.description,
         [],
         newRecords.records,
         '新增',
-        users,
-        userInfo,
+        context.state.configData.users,
+        context.userInfo,
       )
 
       console.log('新文件已建立，ID 為:', recordDocRef.id)
@@ -90,7 +84,7 @@ export default function AddRecord({
     }
   }
 
-  if (addRecordMenuState)
+  if (context.state.pageState === 'add_record')
     return (
       <div
         className="d-flex align-items-center justify-content-center"
@@ -117,7 +111,7 @@ export default function AddRecord({
               <i
                 className="bi bi-x-lg fw-bold fs-6"
                 onClick={() => {
-                  setAddRecordMenuState(false)
+                  context.dispatch({ type: 'change_page', name: 'none' })
                   setNewRecords({ title: '', description: '', records: [] })
                 }}
               ></i>
@@ -132,7 +126,7 @@ export default function AddRecord({
               請選擇人員和金額
             </p>
             <div className="mt-3 d-flex justify-content-start align-items-center gap-2 flex-wrap">
-              {configData.users.map((item) => (
+              {context.state.configData.users.map((item) => (
                 <div
                   className={`text-center p-1 hover-darken border rounded ${addBorrower === item.uid ? 'bg-info-subtle' : ''}`}
                   key={item.uid}
@@ -166,7 +160,7 @@ export default function AddRecord({
               </button>
             </div>
             <div className="mt-3 d-flex justify-content-start align-items-center gap-2 flex-wrap">
-              {configData.users.map((item) => (
+              {context.state.configData.users.map((item) => (
                 <div
                   className={`text-center p-1 hover-darken border rounded ${addDebtor === item.uid ? 'bg-info-subtle' : ''}`}
                   key={item.uid}
@@ -288,16 +282,24 @@ export default function AddRecord({
                   ''
                 )}
                 <div className="text-center" style={{ width: '4rem' }}>
-                  <img src={getUserInfo(configData.users, item.borrower).photo} style={{ height: '2rem' }} alt="user" />
+                  <img
+                    src={getUserInfo(context.state.configData.users, item.borrower).photo}
+                    style={{ height: '2rem' }}
+                    alt="user"
+                  />
                   <p className="m-0" style={{ fontSize: '12px' }}>
-                    {getUserInfo(configData.users, item.borrower).name}
+                    {getUserInfo(context.state.configData.users, item.borrower).name}
                   </p>
                 </div>
                 <img src="/arrow.png" style={{ height: '3rem' }} alt="arrow" />
                 <div className="text-center" style={{ width: '4rem', marginRight: '2rem' }}>
-                  <img src={getUserInfo(configData.users, item.debtor).photo} style={{ height: '2rem' }} alt="user" />
+                  <img
+                    src={getUserInfo(context.state.configData.users, item.debtor).photo}
+                    style={{ height: '2rem' }}
+                    alt="user"
+                  />
                   <p className="m-0" style={{ fontSize: '12px' }}>
-                    {getUserInfo(configData.users, item.debtor).name}
+                    {getUserInfo(context.state.configData.users, item.debtor).name}
                   </p>
                 </div>
                 {!editMode ? (
@@ -346,10 +348,10 @@ export default function AddRecord({
                   return alert('請填寫標題、描述並新增至少一筆紀錄')
                 if (!firstRef.current) return
                 firstRef.current = false
-                await saveDatabase(newRecords, userInfo.current.groupId)
+                await saveDatabase(newRecords, context.userInfo.current.groupId)
                 alert('紀錄新增成功')
                 setNewRecords({ title: '', description: '', records: [] })
-                setAddRecordMenuState(false)
+                context.dispatch({ type: 'change_page', name: 'none' })
                 setEditMode(false)
                 await getConfigData() // section1
                 await getRecentRecords() // section2

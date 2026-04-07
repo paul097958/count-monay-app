@@ -11,11 +11,13 @@ import {
   where,
   updateDoc,
 } from 'firebase/firestore'
-import { getUserInfo, formatTimestamp, numberWithCommas, getFixedOrder } from '../common/RecordFunction'
+import { getUserInfo, formatTimestamp, numberWithCommas, getFixedOrder } from '../common/FunctionBase'
 import { db } from '../config'
-import { useMemo, useRef, useState } from 'react'
+import { useMemo, useRef, useState, useContext } from 'react'
+import { AppContext } from '../common/Reducer.js'
 
-export default function Detail({ userInfo, configData, debtData }) {
+export default function Detail() {
+  const context = useContext(AppContext)
   const separateTotalRef = useRef(new Map())
   const allTotalRef = useRef(new Map())
   const [userRecords, setUserRecords] = useState([])
@@ -27,16 +29,16 @@ export default function Detail({ userInfo, configData, debtData }) {
   const [selectDate, setSelectDate] = useState('')
   const [recordsOrderStatus, setRecordsOrderStatus] = useState('desc')
   const getWhetherCorrect = useMemo(() => {
-    return debtData
+    return context.state.debtData
       .filter((item) => item.debt !== 0)
       .map((item) => item.debt)
       .reduce((sum, current) => sum + current, 0) === userRecordsStatic.reduce((sum, item) => sum + item.shouldGet, 0)
       ? '帳目正確'
       : '帳目有誤'
-  }, [debtData, userRecordsStatic])
+  }, [context.state.debtData, userRecordsStatic])
 
   async function saveDatabase(configRecords) {
-    const docConfigRef = doc(db, userInfo.current.groupId, 'config')
+    const docConfigRef = doc(db, context.userInfo.current.groupId, 'config')
     try {
       await updateDoc(docConfigRef, {
         records: configRecords,
@@ -81,16 +83,16 @@ export default function Detail({ userInfo, configData, debtData }) {
   async function getDocsByUserId() {
     try {
       const q = query(
-        collection(db, userInfo.current.groupId),
-        where('users', 'array-contains', userInfo.current.sub),
+        collection(db, context.userInfo.current.groupId),
+        where('users', 'array-contains', context.userInfo.current.sub),
         orderBy('createdAt', 'desc'),
       )
       const querySnapshot = await getDocs(q)
       const data = querySnapshot.docs.map((doc) => {
         const docData = doc.data()
         let count = 0
-        const borrowerFilter = docData.records.filter((item) => item.borrower === userInfo.current.sub)
-        const debtorFilter = docData.records.filter((item) => item.debtor === userInfo.current.sub)
+        const borrowerFilter = docData.records.filter((item) => item.borrower === context.userInfo.current.sub)
+        const debtorFilter = docData.records.filter((item) => item.debtor === context.userInfo.current.sub)
         borrowerFilter.forEach((item) => (count += item.debt))
         debtorFilter.forEach((item) => (count -= item.debt))
         return {
@@ -114,7 +116,7 @@ export default function Detail({ userInfo, configData, debtData }) {
 
   async function getAllDocs() {
     try {
-      const q = query(collection(db, userInfo.current.groupId), orderBy('createdAt', 'desc'))
+      const q = query(collection(db, context.userInfo.current.groupId), orderBy('createdAt', 'desc'))
       const querySnapshot = await getDocs(q)
       querySnapshot.docs.forEach((doc) => {
         const docData = doc.data()
@@ -366,23 +368,23 @@ export default function Detail({ userInfo, configData, debtData }) {
                     <div className="d-flex align-items-center justify-content-center mb-4">
                       <div className="text-center" style={{ width: '4rem' }}>
                         <img
-                          src={getUserInfo(configData.users, itemBody.borrower).photo}
+                          src={getUserInfo(context.state.configData.users, itemBody.borrower).photo}
                           style={{ height: '2rem' }}
                           alt="user"
                         />
                         <p className="m-0" style={{ fontSize: '12px' }}>
-                          {getUserInfo(configData.users, itemBody.borrower).name}
+                          {getUserInfo(context.state.configData.users, itemBody.borrower).name}
                         </p>
                       </div>
                       <img src="/arrow.png" style={{ height: '3rem' }} alt="arrow" />
                       <div className="text-center" style={{ width: '4rem', marginRight: '2rem' }}>
                         <img
-                          src={getUserInfo(configData.users, itemBody.debtor).photo}
+                          src={getUserInfo(context.state.configData.users, itemBody.debtor).photo}
                           style={{ height: '2rem' }}
                           alt="user"
                         />
                         <p className="m-0" style={{ fontSize: '12px' }}>
-                          {getUserInfo(configData.users, itemBody.debtor).name}
+                          {getUserInfo(context.state.configData.users, itemBody.debtor).name}
                         </p>
                       </div>
                       <div className="mx-4 d-flex flex-column align-items-center" style={{ width: '6rem' }}>

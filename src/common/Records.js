@@ -11,16 +11,8 @@ class Records {
       const conflict = this.#checkConflict()
       if (conflict.status) {
         this.records.push({ borrower, debtor, debt, remark })
-        this.records.forEach((item) => {
-          const borrowerFind = this.users.find(item.borrower)
-          const debtorFind = this.users.find(item.debtor)
-          if (!borrowerFind) {
-            this.users.push(item.borrower)
-          }
-          if (!debtorFind) {
-            this.users.push(item.debtor)
-          }
-        })
+        const users = [...new Set(this.records.flatMap((item) => [item.borrower, item.debtor]))]
+        this.users = users
         return conflict
       } else {
         return conflict

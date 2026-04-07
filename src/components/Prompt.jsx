@@ -1,15 +1,18 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useContext } from 'react'
 import { getFirestore, doc, addDoc, collection, runTransaction, serverTimestamp, updateDoc } from 'firebase/firestore'
 import { db } from '../config.js'
+import { AppContext } from '../common/Reducer.js'
 
-export default function Prompt({ promptMenuState, setPromptMenuState, configData, userInfo }) {
-  const [prompt, setPrompt] = useState(configData.prompt || '')
-  const convertUsersToText = configData.users.map((user) => `- ${user.name} (${user.uid})`).join('\n')
+export default function Prompt() {
+  const context = useContext(AppContext)
+  const [prompt, setPrompt] = useState(context.state.configData.prompt || '')
+
+  const convertUsersToText = context.state.configData.users.map((user) => `- ${user.name} (${user.uid})`).join('\n')
   useEffect(() => {
-    setPrompt(configData.prompt || '')
-  }, [configData])
+    setPrompt(context.state.configData.prompt || '')
+  }, [context.state.configData.prompt])
 
-  if (promptMenuState)
+  if (context.state.pageState === 'prompt_menu')
     return (
       <div
         className="d-flex align-items-center justify-content-center"
@@ -57,7 +60,7 @@ export default function Prompt({ promptMenuState, setPromptMenuState, configData
             <button
               className="btn btn-secondary w-50 mt-2"
               onClick={() => {
-                setPromptMenuState(false)
+                context.dispatch({ type: 'change_page', name: 'none' })
               }}
             >
               關閉視窗
@@ -65,12 +68,12 @@ export default function Prompt({ promptMenuState, setPromptMenuState, configData
             <button
               className="btn btn-warning w-50 mt-2"
               onClick={async () => {
-                await updateDoc(doc(db, userInfo.current.groupId, 'config'), {
+                await updateDoc(doc(db, context.userInfo.current.groupId, 'config'), {
                   prompt: prompt,
                   updatedAt: serverTimestamp(),
                 })
                 alert('提示詞已更新')
-                setPromptMenuState(false)
+                context.dispatch({ type: 'change_page', name: 'none' })
               }}
             >
               確認變更

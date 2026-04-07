@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from 'react'
-import { getFirestore, doc, addDoc, collection, runTransaction, serverTimestamp, updateDoc } from 'firebase/firestore'
+import { useState, useEffect, useRef, useContext } from 'react'
+import { doc, runTransaction } from 'firebase/firestore'
 import { db } from '../config.js'
 import {
   updateRecordDebt,
@@ -10,20 +10,13 @@ import {
   getFixedOrder,
   mergeDebtArrays,
   numberWithCommas,
-} from '../common/RecordFunction.js'
+} from '../common/FunctionBase.js'
 import sendMessage from '../common/SendMessage.js'
+import { AppContext } from '../common/Reducer.js'
 
-export default function SetRecords({
-  recordMenuState,
-  setRecordMenuState,
-  menu,
-  setMenu,
-  users,
-  userInfo,
-  getConfigData,
-  getRecentRecords,
-}) {
-  const [menuChange, setMenuChange] = useState(menu)
+export default function SetRecords({ getConfigData, getRecentRecords }) {
+  const context = useContext(AppContext)
+  const [menuChange, setMenuChange] = useState(context.state.recordMenu)
   const [newTabOpenState, setNewTabOpenState] = useState(false)
   const [addBorrower, setAddBorrower] = useState('')
   const [addDebtor, setAddDebtor] = useState('')
@@ -34,8 +27,8 @@ export default function SetRecords({
   const firstRef = useRef(true)
 
   useEffect(() => {
-    setMenuChange(menu)
-  }, [menu])
+    setMenuChange(context.state.recordMenu)
+  }, [context.state.recordMenu])
 
   const calculateRecordsDiff = (oldRecords, newRecords) => {
     const nameOldRecords = oldRecords.map((item) => {
@@ -105,8 +98,8 @@ export default function SetRecords({
   async function saveDatabaseCombined(recordsData, isDelete = false) {
     console.log(recordsData)
 
-    const docConfigRef = doc(db, userInfo.current.groupId, 'config')
-    const docRecordRef = doc(db, userInfo.current.groupId, menuChange.id)
+    const docConfigRef = doc(db, context.userInfo.current.groupId, 'config')
+    const docRecordRef = doc(db, context.userInfo.current.groupId, menuChange.id)
 
     // 1. 預處理資料 (在 Transaction 外處理以保持交易簡潔)
     const newRecordsArray = recordsData.map((item) => {
@@ -141,28 +134,28 @@ export default function SetRecords({
         const recordData = recordDoc.data().records
         if (isDelete) {
           sendMessage(
-            userInfo.current.name,
-            userInfo.current.picture,
+            context.userInfo.current.name,
+            context.userInfo.current.picture,
             menuChange.title,
             menuChange.description,
             recordData,
             [],
             '刪除',
-            users,
-            userInfo,
+            context.state.configData.users,
+            context.userInfo,
           )
           transaction.delete(docRecordRef)
         } else {
           sendMessage(
-            userInfo.current.name,
-            userInfo.current.picture,
+            context.userInfo.current.name,
+            context.userInfo.current.picture,
             menuChange.title,
             menuChange.description,
             recordData,
             menuChange.records,
             '更改',
-            users,
-            userInfo,
+            context.state.configData.users,
+            context.userInfo,
           )
           transaction.update(docRecordRef, {
             title: menuChange.title,
@@ -180,7 +173,7 @@ export default function SetRecords({
     }
   }
 
-  if (recordMenuState)
+  if (context.state.recordMenu !== null)
     return (
       <div
         className="d-flex align-items-center justify-content-center"
@@ -207,8 +200,7 @@ export default function SetRecords({
               <i
                 className="bi bi-x-lg fw-bold fs-6"
                 onClick={() => {
-                  setRecordMenuState(false)
-                  setMenu({ title: '', description: '', records: [] })
+                  context.dispatch({ type: 'set_recordMenu', value: null })
                   setEditMode(false)
                 }}
               ></i>
@@ -266,16 +258,24 @@ export default function SetRecords({
                       ''
                     )}
                     <div className="text-center" style={{ width: '4rem' }}>
-                      <img src={getUserInfo(users, item.borrower).photo} style={{ height: '2rem' }} alt="user" />
+                      <img
+                        src={getUserInfo(context.state.configData.users, item.borrower).photo}
+                        style={{ height: '2rem' }}
+                        alt="user"
+                      />
                       <p className="m-0" style={{ fontSize: '12px' }}>
-                        {getUserInfo(users, item.borrower).name}
+                        {getUserInfo(context.state.configData.users, item.borrower).name}
                       </p>
                     </div>
                     <img src="/arrow.png" style={{ height: '3rem' }} alt="arrow" />
                     <div className="text-center" style={{ width: '4rem', marginRight: '2rem' }}>
-                      <img src={getUserInfo(users, item.debtor).photo} style={{ height: '2rem' }} alt="user" />
+                      <img
+                        src={getUserInfo(context.state.configData.users, item.debtor).photo}
+                        style={{ height: '2rem' }}
+                        alt="user"
+                      />
                       <p className="m-0" style={{ fontSize: '12px' }}>
-                        {getUserInfo(users, item.debtor).name}
+                        {getUserInfo(context.state.configData.users, item.debtor).name}
                       </p>
                     </div>
                     {!editMode ? (
@@ -322,7 +322,7 @@ export default function SetRecords({
                     請選擇人員和金額
                   </p>
                   <div className="mt-3 d-flex justify-content-start align-items-center gap-2 flex-wrap">
-                    {users.map((item) => (
+                    {context.state.configData.users.map((item) => (
                       <div
                         className={`text-center p-1 hover-darken border rounded ${addBorrower === item.uid ? 'bg-info-subtle' : ''}`}
                         key={item.uid}
@@ -356,7 +356,7 @@ export default function SetRecords({
                     </button>
                   </div>
                   <div className="mt-3 d-flex justify-content-start align-items-center gap-2 flex-wrap">
-                    {users.map((item) => (
+                    {context.state.configData.users.map((item) => (
                       <div
                         className={`text-center p-1 hover-darken border rounded ${addDebtor === item.uid ? 'bg-info-subtle' : ''}`}
                         key={item.uid}
@@ -456,7 +456,7 @@ export default function SetRecords({
                 <button
                   className="btn btn-outline-secondary btn-sm"
                   onClick={() => {
-                    setMenuChange(menu)
+                    setMenuChange(context.state.recordMenu)
                   }}
                 >
                   取消變更
@@ -466,13 +466,12 @@ export default function SetRecords({
                   onClick={async () => {
                     if (!firstRef.current) return
                     firstRef.current = false
-                    await saveDatabaseCombined(calculateRecordsDiff(menu.records, []), true)
+                    await saveDatabaseCombined(calculateRecordsDiff(context.state.recordMenu.records, []), true)
                     await getConfigData() // section1
                     await getRecentRecords() // section2
                     alert('紀錄已刪除')
-                    setRecordMenuState(false)
+                    context.dispatch({ type: 'set_recordMenu', value: null })
                     setEditMode(false)
-                    setMenu({ title: '', description: '', records: [] })
                     firstRef.current = true
                   }}
                 >
@@ -486,13 +485,12 @@ export default function SetRecords({
                     if (menuChange.records.length === 0) return alert('請至少新增一筆紀錄')
                     if (menuChange.title.trim() === '') return alert('請填寫標題')
                     if (menuChange.description.trim() === '') return alert('請填寫描述')
-                    await saveDatabaseCombined(calculateRecordsDiff(menu.records, menuChange.records))
+                    await saveDatabaseCombined(calculateRecordsDiff(context.records, menuChange.records))
                     await getConfigData() // section1
                     await getRecentRecords() // section2
                     alert('紀錄已更新')
-                    setRecordMenuState(false)
+                    context.dispatch({ type: 'set_recordMenu', value: null })
                     setEditMode(false)
-                    setMenu({ title: '', description: '', records: [] })
                     firstRef.current = true
                   }}
                 >
