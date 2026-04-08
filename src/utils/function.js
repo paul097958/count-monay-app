@@ -83,3 +83,8 @@ export function formatTimestamp(timestamp) {
   const minutes = date.getMinutes().toString().padStart(2, '0')
   return `${month}/${day} ${hours}:${minutes}`
 }
+
+export function truncateText(str, maxLength) {
+    if (!str) return ''
+    return str.length > maxLength ? str.slice(0, maxLength) + '...' : str
+  }

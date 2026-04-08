@@ -10,11 +10,11 @@ import {
   getFixedOrder,
   mergeDebtArrays,
   numberWithCommas,
-} from '../common/FunctionBase.js'
+} from '../utils/function.js'
 import sendMessage from '../common/SendMessage.js'
-import { AppContext } from '../common/Reducer.js'
+import { AppContext } from '../reducers/appReducer.js'
 
-export default function SetRecords({ getConfigData, getRecentRecords }) {
+export default function SetRecords() {
   const context = useContext(AppContext)
   const [menuChange, setMenuChange] = useState(context.state.recordMenu)
   const [newTabOpenState, setNewTabOpenState] = useState(false)
@@ -27,7 +27,9 @@ export default function SetRecords({ getConfigData, getRecentRecords }) {
   const firstRef = useRef(true)
 
   useEffect(() => {
-    setMenuChange(context.state.recordMenu)
+    console.log(context.state.recordMenu);
+    
+    setMenuChange({ ...context.state.recordMenu })
   }, [context.state.recordMenu])
 
   const calculateRecordsDiff = (oldRecords, newRecords) => {
@@ -223,7 +225,7 @@ export default function SetRecords({ getConfigData, getRecentRecords }) {
               />
             ) : (
               <p className="fs-4 fw-light mb-1 d-inline">
-                標題：<strong>{menuChange.title || '未命名'}</strong>
+                標題：<strong>{context.state.recordMenu.title || '未命名'}</strong>
               </p>
             )}
             {editMode ? (
@@ -237,13 +239,13 @@ export default function SetRecords({ getConfigData, getRecentRecords }) {
                 }}
               />
             ) : (
-              <p className="fs-6 text-secondary mb-0">{menuChange.description || '未設定'}</p>
+              <p className="fs-6 text-secondary mb-0">{context.state.recordMenu.description || '未設定'}</p>
             )}
             <button className="btn btn-outline-dark btn-sm mt-1" onClick={() => setEditMode(!editMode)}>
               編輯
             </button>
             <div className="d-flex flex-column">
-              {menuChange.records.map((item, index) => (
+              {(menuChange.records)||(context.state.recordMenu.records).map((item, index) => (
                 <div key={item.id}>
                   <hr />
                   <div className="d-flex align-items-center">
@@ -467,8 +469,6 @@ export default function SetRecords({ getConfigData, getRecentRecords }) {
                     if (!firstRef.current) return
                     firstRef.current = false
                     await saveDatabaseCombined(calculateRecordsDiff(context.state.recordMenu.records, []), true)
-                    await getConfigData() // section1
-                    await getRecentRecords() // section2
                     alert('紀錄已刪除')
                     context.dispatch({ type: 'set_recordMenu', value: null })
                     setEditMode(false)
@@ -485,9 +485,7 @@ export default function SetRecords({ getConfigData, getRecentRecords }) {
                     if (menuChange.records.length === 0) return alert('請至少新增一筆紀錄')
                     if (menuChange.title.trim() === '') return alert('請填寫標題')
                     if (menuChange.description.trim() === '') return alert('請填寫描述')
-                    await saveDatabaseCombined(calculateRecordsDiff(context.records, menuChange.records))
-                    await getConfigData() // section1
-                    await getRecentRecords() // section2
+                    await saveDatabaseCombined(calculateRecordsDiff(context.state.records, menuChange.records))
                     alert('紀錄已更新')
                     context.dispatch({ type: 'set_recordMenu', value: null })
                     setEditMode(false)

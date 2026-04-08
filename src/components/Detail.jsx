@@ -11,10 +11,10 @@ import {
   where,
   updateDoc,
 } from 'firebase/firestore'
-import { getUserInfo, formatTimestamp, numberWithCommas, getFixedOrder } from '../common/FunctionBase'
+import { getUserInfo, formatTimestamp, numberWithCommas, getFixedOrder } from '../utils/function.js'
 import { db } from '../config'
-import { useMemo, useRef, useState, useContext } from 'react'
-import { AppContext } from '../common/Reducer.js'
+import { useMemo, useRef, useState, useContext, useEffect } from 'react'
+import { AppContext } from '../reducers/appReducer.js'
 
 export default function Detail() {
   const context = useContext(AppContext)
@@ -28,6 +28,7 @@ export default function Detail() {
   const [dateSelectMode, setDateSelectMode] = useState('')
   const [selectDate, setSelectDate] = useState('')
   const [recordsOrderStatus, setRecordsOrderStatus] = useState('desc')
+  const [pageNumber, setPageNumber] = useState(1)
   const getWhetherCorrect = useMemo(() => {
     return context.state.debtData
       .filter((item) => item.debt !== 0)
@@ -151,10 +152,10 @@ export default function Detail() {
   }
 
   return (
-    <div className="bg-light rounded border p-2 shadow shadow-sm mt-2">
+    <div>
       <div className="text-start">
-        <p className="fs-4 fw-medium mb-0">帳目詳情</p>
-        <p className="fw-light m-0" style={{ fontSize: '12px' }}>
+        <p className="fs-2 fw-medium mb-0">帳目詳情</p>
+        <p className="fw-light m-0">
           在這裡將顯示所有欠款與還款詳情
         </p>
       </div>
@@ -315,92 +316,128 @@ export default function Detail() {
       )}
       {userRecords.length !== 0 && (
         <div className="list-group mt-2">
-          {userRecords.map((item) => (
-            <div
-              className="list-group-item d-flex flex-column justify-content-start mb-2 bg-light px-1"
-              style={{ minHeight: '5rem', border: 'none' }}
-            >
-              <p
-                className="fw-bold user-select-none text-nowrap text-start mb-0"
-                style={{ fontSize: '1.1rem', color: '#0d6efd' }}
+          {userRecords.map((item, index) => {
+            if (Math.floor(index / 3) + 1 !== pageNumber) return <></>
+            return (
+              <div
+                className="list-group-item d-flex flex-column justify-content-start mb-2 rounded shadow-sm p-3 border"
+                style={{ minHeight: '5rem', border: 'none' }}
               >
-                {item.title}
-              </p>
-              <p className="text-muted small text-start user-select-none mb-0" style={{ fontSize: '0.8rem' }}>
-                {item.description}
-              </p>
-              <p className="text-start user-select-none" style={{ fontSize: '0.8rem' }}>
-                {formatTimestamp(item.createdAt)}
-              </p>
-              <p
-                className="fs-4"
-                style={{
-                  backgroundColor: item.shouldGet < 0 ? '#4ade80' : '#f87171',
-                }}
-              >
-                {item.shouldGet < 0 ? '你應付' : '你應得'} {Math.abs(item.shouldGet)}
-              </p>
-              <div>
-                {item.detail.map((itemBody) => {
-                  const fixOrder = getFixedOrder(itemBody.borrower, itemBody.debtor)
-                  let syntax = 1
-                  if (fixOrder[0] === itemBody.borrower) {
-                    syntax = 1
-                  } else {
-                    syntax = -1
-                  }
-                  const key = `${fixOrder[0]}_${fixOrder[1]}`
-                  if (separateTotalRef.current.has(key)) {
-                    const keyPreviousData = separateTotalRef.current.get(key).debt
-                    separateTotalRef.current.set(key, {
-                      first: fixOrder[0],
-                      second: fixOrder[1],
-                      debt: keyPreviousData + itemBody.debt * syntax,
-                    })
-                  } else {
-                    separateTotalRef.current.set(key, {
-                      first: fixOrder[0],
-                      second: fixOrder[1],
-                      debt: itemBody.debt * syntax,
-                    })
-                  }
-                  return (
-                    <div className="d-flex align-items-center justify-content-center mb-4">
-                      <div className="text-center" style={{ width: '4rem' }}>
-                        <img
-                          src={getUserInfo(context.state.configData.users, itemBody.borrower).photo}
-                          style={{ height: '2rem' }}
-                          alt="user"
-                        />
-                        <p className="m-0" style={{ fontSize: '12px' }}>
-                          {getUserInfo(context.state.configData.users, itemBody.borrower).name}
-                        </p>
+                <p
+                  className="fw-bold user-select-none text-nowrap text-start mb-0"
+                  style={{ fontSize: '1.1rem', color: '#0d6efd' }}
+                >
+                  {item.title}
+                </p>
+                <p className="text-muted small text-start user-select-none mb-0" style={{ fontSize: '0.8rem' }}>
+                  {item.description}
+                </p>
+                <p className="text-start user-select-none" style={{ fontSize: '0.8rem' }}>
+                  {formatTimestamp(item.createdAt)}
+                </p>
+                <p
+                  className="fs-4"
+                  style={{
+                    backgroundColor: item.shouldGet < 0 ? '#4ade80' : '#f87171',
+                  }}
+                >
+                  {item.shouldGet < 0 ? '你應付' : '你應得'} {Math.abs(item.shouldGet)}
+                </p>
+                <div>
+                  {item.detail.map((itemBody) => {
+                    const fixOrder = getFixedOrder(itemBody.borrower, itemBody.debtor)
+                    let syntax = 1
+                    if (fixOrder[0] === itemBody.borrower) {
+                      syntax = 1
+                    } else {
+                      syntax = -1
+                    }
+                    const key = `${fixOrder[0]}_${fixOrder[1]}`
+                    if (separateTotalRef.current.has(key)) {
+                      const keyPreviousData = separateTotalRef.current.get(key).debt
+                      separateTotalRef.current.set(key, {
+                        first: fixOrder[0],
+                        second: fixOrder[1],
+                        debt: keyPreviousData + itemBody.debt * syntax,
+                      })
+                    } else {
+                      separateTotalRef.current.set(key, {
+                        first: fixOrder[0],
+                        second: fixOrder[1],
+                        debt: itemBody.debt * syntax,
+                      })
+                    }
+                    return (
+                      <div className="d-flex align-items-center justify-content-center mb-4">
+                        <div className="text-center" style={{ width: '4rem' }}>
+                          <img
+                            src={getUserInfo(context.state.configData.users, itemBody.borrower).photo}
+                            style={{ height: '2rem' }}
+                            alt="user"
+                          />
+                          <p className="m-0" style={{ fontSize: '12px' }}>
+                            {getUserInfo(context.state.configData.users, itemBody.borrower).name}
+                          </p>
+                        </div>
+                        <img src="/arrow.png" style={{ height: '3rem' }} alt="arrow" />
+                        <div className="text-center" style={{ width: '4rem', marginRight: '2rem' }}>
+                          <img
+                            src={getUserInfo(context.state.configData.users, itemBody.debtor).photo}
+                            style={{ height: '2rem' }}
+                            alt="user"
+                          />
+                          <p className="m-0" style={{ fontSize: '12px' }}>
+                            {getUserInfo(context.state.configData.users, itemBody.debtor).name}
+                          </p>
+                        </div>
+                        <div className="mx-4 d-flex flex-column align-items-center" style={{ width: '6rem' }}>
+                          <p className="m-0 fw-bold fs-5">${numberWithCommas(itemBody.debt)}</p>
+                          <p className="m-0 text-center" style={{ fontSize: '12px' }}>
+                            {itemBody.remark}
+                          </p>
+                        </div>
                       </div>
-                      <img src="/arrow.png" style={{ height: '3rem' }} alt="arrow" />
-                      <div className="text-center" style={{ width: '4rem', marginRight: '2rem' }}>
-                        <img
-                          src={getUserInfo(context.state.configData.users, itemBody.debtor).photo}
-                          style={{ height: '2rem' }}
-                          alt="user"
-                        />
-                        <p className="m-0" style={{ fontSize: '12px' }}>
-                          {getUserInfo(context.state.configData.users, itemBody.debtor).name}
-                        </p>
-                      </div>
-                      <div className="mx-4 d-flex flex-column align-items-center" style={{ width: '6rem' }}>
-                        <p className="m-0 fw-bold fs-5">${numberWithCommas(itemBody.debt)}</p>
-                        <p className="m-0 text-center" style={{ fontSize: '12px' }}>
-                          {itemBody.remark}
-                        </p>
-                      </div>
-                    </div>
-                  )
-                })}
+                    )
+                  })}
+                </div>
               </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       )}
+      {
+        userRecords.length !== 0 && <div className='d-flex justify-content-center mt-3'>
+          <nav>
+            <ul className="pagination">
+              <li className="page-item">
+                <button className="page-link" onClick={() => setPageNumber(prop => Math.max(1, prop - 1))}>
+                  <span aria-hidden="true">&laquo;</span>
+                </button>
+              </li>
+              {
+                Array.from({ length: 5 }, (_, i) => {
+                  const totalPage = Math.ceil(userRecords.length / 3)
+                  if (pageNumber <= 2) {
+                    return <li className="page-item"><button className="page-link" onClick={() => setPageNumber(i + 1)}>{i + 1}</button></li>
+                  } else if (pageNumber >= totalPage - 2) {
+                    return <li className="page-item"><button className="page-link" onClick={() => setPageNumber(totalPage - (i + 1))}>{totalPage - (i + 1)}</button></li>
+                  } else {
+                    return <li className="page-item"><button className="page-link" onClick={() => setPageNumber(i - 2 + pageNumber)}>{i - 2 + pageNumber}</button></li>
+                  }
+                }
+                )
+
+              }
+              <li className="page-item">
+                <button className="page-link" aria-label="Next" onClick={() => setPageNumber(prop => prop + 1)}>
+                  <span aria-hidden="true">&raquo;</span>
+                </button>
+              </li>
+            </ul>
+          </nav>
+        </div>
+      }
+
     </div>
   )
 }

@@ -1,6 +1,6 @@
 import { ClipLoader } from 'react-spinners'
 import { useContext } from 'react'
-import { AppContext } from '../common/Reducer.js'
+import { AppContext } from '../reducers/appReducer.js'
 
 export default function Loading() {
   const context = useContext(AppContext)

@@ -1,11 +1,11 @@
 import { createContext } from 'react'
 
-export function reducer(state, action) {
+export function appReducer(state, action) {
   switch (action.type) {
     case 'set_loading':
       return {
         ...state,
-        loading: !state.loading,
+        loading: action.value,
       }
 
     case 'change_page':
@@ -19,7 +19,10 @@ export function reducer(state, action) {
 
     case 'set_recordMenu':
       if (action.value === null) {
-        return null
+        return {
+          ...state,
+          recordMenu: null
+        }
       } else {
         return {
           ...state,

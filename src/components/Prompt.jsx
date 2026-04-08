@@ -1,7 +1,7 @@
 import { useState, useEffect, useContext } from 'react'
 import { getFirestore, doc, addDoc, collection, runTransaction, serverTimestamp, updateDoc } from 'firebase/firestore'
 import { db } from '../config.js'
-import { AppContext } from '../common/Reducer.js'
+import { AppContext } from '../reducers/appReducer.js'
 
 export default function Prompt() {
   const context = useContext(AppContext)

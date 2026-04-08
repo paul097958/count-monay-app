@@ -13,10 +13,10 @@ function BarChart({ rawData, labels }) {
       {
         data: rawData.map((v) => Math.abs(v)),
         backgroundColor: rawData.map((v) => (v <= 0 ? '#4ade80' : '#f87171')),
-        barPercentage: 1,
+        barPercentage: 10,
         categoryPercentage: 0.8,
-        borderRadius: 5,
-        maxBarThickness: 30,
+        borderRadius: 4,
+        maxBarThickness: 35,
       },
     ],
   }

@@ -10,11 +10,11 @@ import {
   getFixedOrder,
   mergeDebtArrays,
   numberWithCommas,
-} from '../common/FunctionBase.js'
+} from '../utils/function.js'
 import sendMessage from '../common/SendMessage.js'
-import { AppContext } from '../common/Reducer.js'
+import { AppContext } from '../reducers/appReducer.js'
 
-export default function AddRecord({ getConfigData, getRecentRecords }) {
+export default function AddRecord() {
   const context = useContext(AppContext)
   const [addBorrower, setAddBorrower] = useState('')
   const [addDebtor, setAddDebtor] = useState('')
@@ -353,8 +353,6 @@ export default function AddRecord({ getConfigData, getRecentRecords }) {
                 setNewRecords({ title: '', description: '', records: [] })
                 context.dispatch({ type: 'change_page', name: 'none' })
                 setEditMode(false)
-                await getConfigData() // section1
-                await getRecentRecords() // section2
                 firstRef.current = true
               }}
             >

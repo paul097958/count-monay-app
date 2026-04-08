@@ -12,20 +12,21 @@ import {
   runTransaction,
   startAfter,
   where,
+  onSnapshot
 } from 'firebase/firestore'
 import { db } from './config.js'
 import { LINE_LIFF } from './config.js'
-import BarChart from './components/BarChart.jsx'
 import SetRecords from './components/SetRecords.jsx'
 import Loading from './components/Loading.jsx'
 import Prompt from './components/Prompt.jsx'
 import AddRecord from './components/AddRecord.jsx'
-import { reducer, AppContext } from './common/Reducer.js'
-import { getUserInfo, numberWithCommas, getFixedOrder, formatTimestamp } from './common/FunctionBase.js'
+import { appReducer, AppContext } from './reducers/appReducer.js'
 import Detail from './components/Detail.jsx'
+import DebtData from './components/DebtData.jsx'
+import RecordsData from './components/RecordsData.jsx'
 
 function App() {
-  const [state, dispatch] = useReducer(reducer, {
+  const [state, dispatch] = useReducer(appReducer, {
     configData: { prompt: '', records: [], users: [] },
     debtData: [],
     recordsData: [],
@@ -37,6 +38,12 @@ function App() {
   const firstRef = useRef(true)
   const userInfo = useRef({})
   const lastVisible = useRef(null)
+  const containerRef = useRef()
+
+  useEffect(() => {
+    console.log(state.recordMenu);
+
+  }, [state.recordMenu])
 
   function updateOrAddUser(array, updateData) {
     const { uid } = updateData
@@ -75,17 +82,7 @@ function App() {
     }
   }
 
-  async function getConfigData() {
-    const docRef = doc(db, userInfo.current.groupId, 'config')
-    const docSnap = await getDoc(docRef)
-    if (docSnap.exists()) {
-      const data = docSnap.data()
-      dispatch({ type: 'set_debtData', value: await formatDebtRecords(data.users, data.records, userInfo.current.sub) })
-      dispatch({ type: 'set_configData', value: data })
-    } else {
-      alert('No such document!')
-    }
-  }
+
 
   const formatDebtRecords = (users, records, myId) => {
     const formatted = records.flatMap((record) => {
@@ -114,68 +111,70 @@ function App() {
     return formatted.sort((a, b) => b.debt - a.debt)
   }
 
-  async function getRecentRecords() {
-    try {
-      const q = query(collection(db, userInfo.current.groupId), orderBy('createdAt', 'desc'), limit(10))
-      const snapshot = await getDocs(q)
-      if (snapshot.empty) {
-        dispatch({ type: 'set_hasMore' })
+
+
+  useEffect(() => {
+    if (!userInfo.current?.groupId) return;
+
+    const q = query(
+      collection(db, userInfo.current.groupId),
+      orderBy('createdAt', 'desc'),
+      limit(5)
+    );
+
+    const docRef = doc(db, userInfo.current.groupId, 'config');
+
+    const unsubscribeGetConfigData = onSnapshot(docRef, async (docSnap) => {
+      dispatch({ type: 'set_loading', value: true })
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        try {
+          const formattedDebt = await formatDebtRecords(
+            data.users,
+            data.records,
+            userInfo.current.sub
+          );
+
+          dispatch({ type: 'set_debtData', value: formattedDebt });
+          dispatch({ type: 'set_configData', value: data });
+          dispatch({ type: 'set_loading', value: false })
+        } catch (err) {
+          console.error('格式化資料失敗：', err);
+        }
       } else {
-        lastVisible.current = snapshot.docs[snapshot.docs.length - 1]
-        const data = snapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        }))
-        dispatch({ type: 'set_recordsData', value: data })
+        console.warn('找不到設定文件 (config)!');
       }
-    } catch (error) {
-      console.error('讀取資料失敗：', error)
+    }, (error) => {
+      console.error('監聽 Config 失敗：', error);
+    });
+
+    const unsubscribeGetRecentRecords = onSnapshot(q,
+      (snapshot) => {
+        dispatch({ type: 'set_loading', value: true })
+        if (snapshot.empty) {
+          dispatch({ type: 'set_hasMore' });
+          dispatch({ type: 'set_recordsData', value: [] });
+        } else {
+          lastVisible.current = snapshot.docs[snapshot.docs.length - 1];
+          const data = snapshot.docs.map((doc) => ({
+            id: doc.id,
+            ...doc.data(),
+          }));
+          dispatch({ type: 'set_recordsData', value: data });
+        }
+        dispatch({ type: 'set_loading', value: false })
+      },
+      (error) => {
+        console.error('實時讀取資料失敗：', error);
+      }
+    );
+    return () => {
+      unsubscribeGetRecentRecords()
+      unsubscribeGetConfigData()
     }
-  }
+  }, [userInfo.current?.groupId]); // 當 groupId 改變時重新監聽
 
-  async function getNextData() {
-    try {
-      if (state.loading || !state.hasMore) return
-      dispatch({ type: 'set_loading' })
-      // 如果沒有上一次的最後一份文件，代表已經沒資料了或還沒開始
-      if (!lastVisible.current) {
-        console.log('沒有更多資料了')
-        return
-      }
 
-      const q = query(
-        collection(db, userInfo.current.groupId),
-        orderBy('createdAt', 'desc'),
-        startAfter(lastVisible.current), // 從上一次的結尾開始
-        limit(5),
-      )
-
-      const snapshot = await getDocs(q)
-
-      // 更新最後一份文件的位置
-      if (snapshot.empty) {
-        dispatch({ type: 'set_hasMore' })
-      } else {
-        lastVisible.current = snapshot.docs[snapshot.docs.length - 1]
-        const newData = snapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        }))
-
-        // 累加資料
-        dispatch({ type: 'set_recordsData', value: newData, name: 'accumulate' })
-      }
-    } catch (error) {
-      console.error('讀取下一頁失敗：', error)
-    } finally {
-      dispatch({ type: 'set_loading' })
-    }
-  }
-
-  function truncateText(str, maxLength) {
-    if (!str) return ''
-    return str.length > maxLength ? str.slice(0, maxLength) + '...' : str
-  }
 
   useEffect(() => {
     // 1. 先防擋重複執行，放在最前面
@@ -225,16 +224,12 @@ function App() {
 
         // 6. 執行後續資料載入
         try {
-          await Promise.all([
-            getConfigData(),
-            getRecentRecords(),
-            updateUsers(identity, {
-              uid: userInfo.current.sub,
-              name: userInfo.current.name,
-              photo: userInfo.current.picture,
-            }),
-          ])
-          dispatch({ type: 'set_loading' })
+          await updateUsers(identity, {
+            uid: userInfo.current.sub,
+            name: userInfo.current.name,
+            photo: userInfo.current.picture,
+          })
+          dispatch({ type: 'set_loading', value: false })
         } catch (err) {
           console.error('資料載入失敗:', err)
         }
@@ -256,123 +251,42 @@ function App() {
     <AppContext.Provider value={{ state, dispatch, userInfo }}>
       <div className="App">
         <Loading />
-        <AddRecord getConfigData={getConfigData} getRecentRecords={getRecentRecords} />
-        <SetRecords getConfigData={getConfigData} getRecentRecords={getRecentRecords} />
+        <AddRecord />
+        <SetRecords />
         <Prompt />
         <nav className="navbar bg-primary-subtle">
           <div className="container-fluid">
             <div className="navbar-brand d-flex align-items-center gap-3">
               <img src="/logo.jpg" alt="Logo" height="35" className="d-inline-block align-text-top" />
-              <span className="fs-5">算錢工具 v0.2.0</span>
+              <span className="fs-5">算錢工具 v0.3.0beta</span>
             </div>
           </div>
         </nav>
-        <div className="container" style={{ maxWidth: '40rem' }}>
-          <div className="m-3">
-            <div className="bg-light rounded border p-2 shadow shadow-sm">
-              <div className="text-start">
-                <p className="fs-4 fw-medium mb-0">欠款專區</p>
-                <p className="fw-light m-0" style={{ fontSize: '12px' }}>
-                  紅色為欠你錢、綠色為你欠別人錢
-                </p>
-                <div className="mt-2 d-flex flex-wrap gap-2">
-                  {state.debtData
-                    .filter((item) => item.debt !== 0)
-                    .map((item) => (
-                      <img
-                        src={item.photo || '/gray-icon.png'}
-                        alt={item.name}
-                        className="rounded shadow-sm border"
-                        style={{ height: '2rem' }}
-                      />
-                    ))}
-                </div>
-              </div>
-              <div>
-                <BarChart
-                  rawData={state.debtData.filter((item) => item.debt !== 0).map((item) => item.debt)}
-                  labels={state.debtData.filter((item) => item.debt !== 0).map((item) => item.name)}
-                />
-              </div>
+        <div className="container p-4" ref={containerRef} style={{ maxWidth: '40rem' }}>
+          <DebtData containerRef={containerRef} />
+          <hr />
+          <RecordsData lastVisible={lastVisible} />
+          <hr />
+          <Detail />
+          <hr />
+          <div>
+            <div className="text-start">
+              <p className="fs-2 fw-medium mb-0">設定專區</p>
+              <p className="fw-light m-0">
+                在這裡將設定算錢工具機器人和權限
+              </p>
             </div>
-            <div className="bg-light rounded border p-2 shadow shadow-sm mt-2">
-              <div className="text-start">
-                <p className="fs-4 fw-medium mb-0">明細專區</p>
-                <p className="fw-light m-0" style={{ fontSize: '12px' }}>
-                  在這裡將顯示所有交易的明細紀錄
-                </p>
-              </div>
+            <div className="mt-2 gap-1 row">
               <button
-                className="btn btn-outline-primary w-100 mt-2"
+                className="btn btn-outline-secondary col"
                 onClick={() => {
-                  dispatch({ type: 'change_page', name: 'add_record' })
+                  dispatch({ type: 'change_page', name: 'prompt_menu' })
                 }}
               >
-                新增明細
+                提示詞設定
               </button>
-              <div className="mt-2 list-group">
-                {state.recordsData.map((item) => (
-                  <div
-                    className="list-group-item list-group-item-action d-flex align-items-center p-1 shadow-sm mb-2 rounded border"
-                    onClick={() => {
-                      dispatch({ type: 'set_menu', value: { ...item } })
-                    }}
-                    style={{ height: '5rem' }}
-                  >
-                    <div className="d-flex flex-column align-items-start mx-2">
-                      <div
-                        className="fw-bold user-select-none text-center text-nowrap"
-                        style={{ fontSize: '1.1rem', color: '#0d6efd' }}
-                      >
-                        {truncateText(item.title || '未命名', 12)}
-                      </div>
-                      <div className="text-muted small text-start user-select-none" style={{ fontSize: '0.8rem' }}>
-                        {truncateText(item.description || '未設定', 15)}
-                      </div>
-                    </div>
-                    <span
-                      className="text-muted small ms-auto fw-light user-select-none mx-2"
-                      style={{ fontSize: '10px' }}
-                    >
-                      {formatTimestamp(item.createdAt)}
-                    </span>
-                  </div>
-                ))}
-              </div>
-              <div>
-                {state.hasMore && (
-                  <button
-                    className="fs-6 btn btn-link p-0"
-                    type="button"
-                    onClick={async () => {
-                      await getNextData()
-                    }}
-                  >
-                    加載更多...
-                  </button>
-                )}
-              </div>
-            </div>
-            <Detail />
-            <div className="bg-light rounded border p-2 shadow shadow-sm mt-2">
-              <div className="text-start">
-                <p className="fs-6 fw-medium mb-0">設定專區</p>
-                <p className="fw-light m-0" style={{ fontSize: '12px' }}>
-                  在這裡將設定算錢工具機器人和權限
-                </p>
-              </div>
-              <div className="mt-2 d-flex gap-1">
-                <button
-                  className="btn btn-secondary"
-                  onClick={() => {
-                    dispatch({ type: 'change_page', name: 'prompt_menu' })
-                  }}
-                >
-                  提示詞設定
-                </button>
-                <button className="btn btn-secondary">人員設定</button>
-                <button className="btn btn-warning">權限設定</button>
-              </div>
+              <button className="btn btn-outline-secondary col">人員設定</button>
+              <button className="btn btn-warning col">權限設定</button>
             </div>
           </div>
         </div>
