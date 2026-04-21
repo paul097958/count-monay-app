@@ -1,50 +1,50 @@
 {
-  "name": "count-money-app",
-  "version": "0.2.0",
-  "private": true,
-  "dependencies": {
-    "@line/liff": "^2.27.3",
-    "@testing-library/dom": "^10.4.1",
-    "@testing-library/jest-dom": "^6.9.1",
-    "@testing-library/react": "^16.3.2",
-    "@testing-library/user-event": "^13.5.0",
-    "bootstrap": "^5.3.8",
-    "chart.js": "^4.5.1",
-    "chartjs-plugin-datalabels": "^2.2.0",
-    "firebase": "^12.9.0",
-    "react": "^19.2.4",
-    "react-chartjs-2": "^5.3.1",
-    "react-dom": "^19.2.4",
-    "react-scripts": "5.0.1",
-    "react-spinners": "^0.17.0"
-  },
-  "scripts": {
-    "start": "react-scripts start",
-    "build": "react-scripts build",
-    "test": "react-scripts test",
-    "eject": "react-scripts eject",
-    "prettier": "prettier . --write"
-  },
-  "eslintConfig": {
-    "extends": [
-      "react-app",
-      "react-app/jest"
-    ]
-  },
-  "browserslist": {
-    "production": [
-      ">0.2%",
-      "not dead",
-      "not op_mini all"
-    ],
-    "development": [
-      "last 1 chrome version",
-      "last 1 firefox version",
-      "last 1 safari version"
-    ]
-  },
-  "devDependencies": {
-    "eslint-plugin-react": "^7.37.5",
-    "prettier": "3.8.1"
-  }
+    "name": "count-money-app",
+    "version": "0.2.0",
+    "private": true,
+    "dependencies": {
+        "@line/liff": "^2.27.3",
+        "@testing-library/dom": "^10.4.1",
+        "@testing-library/jest-dom": "^6.9.1",
+        "@testing-library/react": "^16.3.2",
+        "@testing-library/user-event": "^13.5.0",
+        "bootstrap": "^5.3.8",
+        "chart.js": "^4.5.1",
+        "chartjs-plugin-datalabels": "^2.2.0",
+        "firebase": "^12.9.0",
+        "react": "^19.2.4",
+        "react-chartjs-2": "^5.3.1",
+        "react-dom": "^19.2.4",
+        "react-scripts": "5.0.1",
+        "react-spinners": "^0.17.0"
+    },
+    "scripts": {
+        "start": "react-scripts start",
+        "build": "react-scripts build",
+        "test": "react-scripts test",
+        "eject": "react-scripts eject",
+        "prettier": "prettier . --write"
+    },
+    "eslintConfig": {
+        "extends": [
+            "react-app",
+            "react-app/jest"
+        ]
+    },
+    "browserslist": {
+        "production": [
+            ">0.2%",
+            "not dead",
+            "not op_mini all"
+        ],
+        "development": [
+            "last 1 chrome version",
+            "last 1 firefox version",
+            "last 1 safari version"
+        ]
+    },
+    "devDependencies": {
+        "eslint-plugin-react": "^7.37.5",
+        "prettier": "3.8.1"
+    }
 }

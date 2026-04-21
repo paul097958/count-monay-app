@@ -1,38 +1,43 @@
-import { useState, useEffect, useRef, useContext } from 'react'
+import { useState, useEffect, useRef, useContext, useReducer } from 'react'
 import { doc, runTransaction } from 'firebase/firestore'
 import { db } from '../config.js'
 import {
-  updateRecordDebt,
-  updateRecordRemark,
-  deleteRecord,
   getUserInfo,
   checkConflict,
   getFixedOrder,
   mergeDebtArrays,
   numberWithCommas,
+  truncateText,
 } from '../utils/function.js'
-import sendMessage from '../common/SendMessage.js'
-import { AppContext } from '../reducers/appReducer.js'
+import useSendMessage from '../hooks/useSendMessage.js'
+import { AppContext } from '../reducers/app_reducer.js'
+import { recordReducer, RecordContext } from '../reducers/record_reducer.js'
+import Records from '../classes/Records.js'
 
 export default function SetRecords() {
   const context = useContext(AppContext)
-  const [menuChange, setMenuChange] = useState(context.state.recordMenu)
-  const [newTabOpenState, setNewTabOpenState] = useState(false)
-  const [addBorrower, setAddBorrower] = useState('')
-  const [addDebtor, setAddDebtor] = useState('')
-  const [addDebt, setAddDebt] = useState(0)
-  const [addRemark, setAddRemark] = useState('')
-  const [addType, setAddType] = useState('')
-  const [editMode, setEditMode] = useState(false)
+  const [recordState, recordDispatch] = useReducer(recordReducer, {
+    newTabOpenState: false,
+    addBorrower: '',
+    addDebtor: '',
+    addDebt: 0,
+    addRemark: '',
+    addType: '',
+    editMode: false
+  })
+  const send = useSendMessage()
+  const recordsInstance = useRef(
+    new Records(
+      context.state.recordMenu.title,
+      context.state.recordMenu.description,
+      context.state.recordMenu.records,
+      context.dispatch,
+    ),
+  )
   const firstRef = useRef(true)
 
-  useEffect(() => {
-    console.log(context.state.recordMenu);
-    
-    setMenuChange({ ...context.state.recordMenu })
-  }, [context.state.recordMenu])
-
   const calculateRecordsDiff = (oldRecords, newRecords) => {
+    console.log(oldRecords, newRecords)
     const nameOldRecords = oldRecords.map((item) => {
       const fixOrder = getFixedOrder(item.borrower, item.debtor)
       const key = `${fixOrder[0]}_${fixOrder[1]}`
@@ -98,10 +103,8 @@ export default function SetRecords() {
   }
 
   async function saveDatabaseCombined(recordsData, isDelete = false) {
-    console.log(recordsData)
-
     const docConfigRef = doc(db, context.userInfo.current.groupId, 'config')
-    const docRecordRef = doc(db, context.userInfo.current.groupId, menuChange.id)
+    const docRecordRef = doc(db, context.userInfo.current.groupId, context.state.recordMenu.id)
 
     // 1. 預處理資料 (在 Transaction 外處理以保持交易簡潔)
     const newRecordsArray = recordsData.map((item) => {
@@ -127,42 +130,35 @@ export default function SetRecords() {
 
         // --- B. 計算階段 ---
         const oldRecords = configDoc.data().records || []
+        console.log('old', oldRecords)
+        console.log('new', newRecordsArray)
+
         const resultRecords = mergeDebtArrays(oldRecords, newRecordsArray)
 
         // --- C. 寫入階段 ---
         // 更新總帳 (原本的 saveDatabaseConfig 部分)
         transaction.update(docConfigRef, { records: resultRecords })
-        const uniqueUids = [...new Set(menuChange.records.flatMap((item) => [item.borrower, item.debtor]))]
+        const uniqueUids = [
+          ...new Set(context.state.recordMenu.records.flatMap((item) => [item.borrower, item.debtor])),
+        ]
         const recordData = recordDoc.data().records
         if (isDelete) {
-          sendMessage(
-            context.userInfo.current.name,
-            context.userInfo.current.picture,
-            menuChange.title,
-            menuChange.description,
-            recordData,
-            [],
-            '刪除',
-            context.state.configData.users,
-            context.userInfo,
-          )
+          send({
+            senderName: context.userInfo.current.name,
+            senderPhoto: context.userInfo.current.picture,
+            ...recordsInstance.current.getMessageData(recordData, '刪除')
+          })
           transaction.delete(docRecordRef)
         } else {
-          sendMessage(
-            context.userInfo.current.name,
-            context.userInfo.current.picture,
-            menuChange.title,
-            menuChange.description,
-            recordData,
-            menuChange.records,
-            '更改',
-            context.state.configData.users,
-            context.userInfo,
-          )
+          send({
+            senderName: context.userInfo.current.name || '未命名',
+            senderPhoto: context.userInfo.current.picture,
+            ...recordsInstance.current.getMessageData(recordData, '更改'),
+          })
           transaction.update(docRecordRef, {
-            title: menuChange.title,
-            description: menuChange.description,
-            records: menuChange.records,
+            title: context.state.recordMenu.title,
+            description: context.state.recordMenu.description,
+            records: context.state.recordMenu.records,
             users: uniqueUids,
           })
         }
@@ -175,8 +171,8 @@ export default function SetRecords() {
     }
   }
 
-  if (context.state.recordMenu !== null)
-    return (
+  return (
+    <RecordContext.Provider value={{ recordState, recordDispatch }}>
       <div
         className="d-flex align-items-center justify-content-center"
         style={{
@@ -203,7 +199,7 @@ export default function SetRecords() {
                 className="bi bi-x-lg fw-bold fs-6"
                 onClick={() => {
                   context.dispatch({ type: 'set_recordMenu', value: null })
-                  setEditMode(false)
+                  recordDispatch({ type: 'set_editMode', value: false })
                 }}
               ></i>
             </div>
@@ -213,14 +209,14 @@ export default function SetRecords() {
           </div>
           <hr />
           <div className="text-start mt-2">
-            {editMode ? (
+            {recordState.editMode ? (
               <input
                 type="text"
                 className="form-control w-50"
                 placeholder="標題"
-                value={menuChange.title}
+                value={context.state.recordMenu.title}
                 onChange={(e) => {
-                  setMenuChange({ ...menuChange, title: e.target.value })
+                  recordsInstance.current.title = e.target.value
                 }}
               />
             ) : (
@@ -228,32 +224,32 @@ export default function SetRecords() {
                 標題：<strong>{context.state.recordMenu.title || '未命名'}</strong>
               </p>
             )}
-            {editMode ? (
+            {recordState.editMode ? (
               <input
                 type="text"
                 className="form-control mt-1"
                 placeholder="描述"
-                value={menuChange.description}
+                value={context.state.recordMenu.description}
                 onChange={(e) => {
-                  setMenuChange({ ...menuChange, description: e.target.value })
+                  recordsInstance.current.description = e.target.value
                 }}
               />
             ) : (
               <p className="fs-6 text-secondary mb-0">{context.state.recordMenu.description || '未設定'}</p>
             )}
-            <button className="btn btn-outline-dark btn-sm mt-1" onClick={() => setEditMode(!editMode)}>
+            <button className="btn btn-outline-dark btn-sm mt-1" onClick={() => recordDispatch({ type: 'set_editMode', value: !recordState.editMode })}>
               編輯
             </button>
             <div className="d-flex flex-column">
-              {(menuChange.records)||(context.state.recordMenu.records).map((item, index) => (
+              {context.state.recordMenu.records.map((item, index) => (
                 <div key={item.id}>
                   <hr />
                   <div className="d-flex align-items-center">
-                    {editMode ? (
+                    {recordState.editMode ? (
                       <i
                         className="bi bi-trash-fill text-danger fs-6 mx-1"
                         onClick={() => {
-                          deleteRecord(setMenuChange, index)
+                          recordsInstance.current.deleteRecord(index)
                         }}
                       ></i>
                     ) : (
@@ -280,8 +276,11 @@ export default function SetRecords() {
                         {getUserInfo(context.state.configData.users, item.debtor).name}
                       </p>
                     </div>
-                    {!editMode ? (
-                      <div className="mx-4 d-flex flex-column align-items-center" style={{ width: '6rem' }}>
+                    {!recordState.editMode ? (
+                      <div
+                        className="mx-4 d-flex flex-column align-items-center"
+                        style={{ width: '6rem' }}
+                      >
                         <p className="m-0 fw-bold fs-5">${numberWithCommas(item.debt)}</p>
                         <p className="m-0 text-center" style={{ fontSize: '12px' }}>
                           {item.remark}
@@ -290,24 +289,27 @@ export default function SetRecords() {
                     ) : (
                       ''
                     )}
-                    {editMode ? (
+                    {recordState.editMode ? (
                       <div>
                         <input
                           type="text"
                           className="form-control"
                           placeholder="名稱"
-                          value={menuChange.records[index].remark}
+                          value={context.state.recordMenu.records[index].remark}
                           onChange={(e) => {
-                            updateRecordRemark(setMenuChange, index, e.target.value)
+                            recordsInstance.current.updateRecordRemark(index, e.target.value)
                           }}
                         />
                         <input
                           type="number"
                           className="form-control mt-1"
                           placeholder="金額"
-                          value={menuChange.records[index].debt}
+                          value={context.state.recordMenu.records[index].debt}
                           onChange={(e) => {
-                            updateRecordDebt(setMenuChange, index, Number(e.target.value))
+                            recordsInstance.current.updateRecordDebt(
+                              index,
+                              Number(e.target.value),
+                            )
                           }}
                         />
                       </div>
@@ -317,61 +319,82 @@ export default function SetRecords() {
                   </div>
                 </div>
               ))}
-              {newTabOpenState ? (
-                <div className="p-2 rounded bg-light mt-2 shadow-sm border">
-                  <p className="fs-5 mb-0">新增項目</p>
+              {recordState.newTabOpenState ? (
+                <div className="p-2 rounded bg-light mt-3 shadow-sm border">
+                  <div className="d-flex justify-content-between align-items-center">
+                    <p className="fs-5 mb-0">新增項目</p>
+                    <i
+                      className="bi bi-x-lg fw-bold fs-6"
+                      onClick={() => {
+                        context.dispatch({ type: 'set_recordMenu', value: null })
+                        recordDispatch({ type: 'set_newTabOpenState', value: false })
+                      }}
+                    ></i>
+                  </div>
                   <p className="fw-light m-0" style={{ fontSize: '12px' }}>
                     請選擇人員和金額
                   </p>
-                  <div className="mt-3 d-flex justify-content-start align-items-center gap-2 flex-wrap">
-                    {context.state.configData.users.map((item) => (
-                      <div
-                        className={`text-center p-1 hover-darken border rounded ${addBorrower === item.uid ? 'bg-info-subtle' : ''}`}
-                        key={item.uid}
+                  <div className="mt-3 d-flex justify-content-center gap-4">
+                    <div className="list-group">
+                      {context.state.configData.users.map((item) => (
+                        <div
+                          className={`list-group-item d-flex align-items-center gap-2 ${recordState.addBorrower === item.uid ? 'bg-info-subtle' : ''}`}
+                          key={item.uid}
+                          onClick={() => {
+                            recordDispatch({ type: 'set_addBorrower', value: item.uid })
+                          }}
+                        >
+                          <img
+                            src={item.photo}
+                            className="shadow-sm"
+                            style={{ height: '1.2rem' }}
+                            alt="user"
+                          />
+                          <p className="m-0 user-select-none" style={{ fontSize: '12px' }}>
+                            {truncateText(item.name, 7)}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="d-flex flex-column justify-content-center gap-3">
+                      <button
+                        className={`btn ${recordState.addType === 'debt' ? 'btn-danger' : 'btn-outline-danger'}`}
                         onClick={() => {
-                          setAddBorrower(item.uid)
+                          recordDispatch({ type: 'set_addType', value: 'debt' })
                         }}
                       >
-                        <img src={item.photo} className="rounded shadow-sm" style={{ height: '2rem' }} alt="user" />
-                        <p className="m-0 user-select-none" style={{ fontSize: '12px' }}>
-                          {item.name}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="d-flex justify-content-center gap-3 mt-2 md-2">
-                    <button
-                      className={`btn ${addType === 'debt' ? 'btn-danger' : 'btn-outline-danger'}`}
-                      onClick={() => {
-                        setAddType('debt')
-                      }}
-                    >
-                      欠
-                    </button>
-                    <button
-                      className={`btn ${addType === 'return' ? 'btn-primary' : 'btn-outline-primary'}`}
-                      onClick={() => {
-                        setAddType('return')
-                      }}
-                    >
-                      還
-                    </button>
-                  </div>
-                  <div className="mt-3 d-flex justify-content-start align-items-center gap-2 flex-wrap">
-                    {context.state.configData.users.map((item) => (
-                      <div
-                        className={`text-center p-1 hover-darken border rounded ${addDebtor === item.uid ? 'bg-info-subtle' : ''}`}
-                        key={item.uid}
+                        欠
+                      </button>
+                      <button
+                        className={`btn ${recordState.addType === 'return' ? 'btn-primary' : 'btn-outline-primary'}`}
                         onClick={() => {
-                          setAddDebtor(item.uid)
+                          recordDispatch({ type: 'set_addType', value: 'return' })
                         }}
                       >
-                        <img src={item.photo} className="rounded shadow-sm" style={{ height: '2rem' }} alt="user" />
-                        <p className="m-0 user-select-none" style={{ fontSize: '12px' }}>
-                          {item.name}
-                        </p>
-                      </div>
-                    ))}
+                        還
+                      </button>
+                    </div>
+                    <div className="list-group">
+                      {context.state.configData.users.map((item) => (
+                        <div
+                          className={`list-group-item d-flex align-items-center gap-2 ${recordState.addDebtor === item.uid ? 'bg-info-subtle' : ''}`}
+                          key={item.uid}
+                          onClick={() => {
+                            recordDispatch({ type: 'set_addDebtor', value: item.uid })
+                          }}
+                        >
+                          <img
+                            src={item.photo}
+                            className="shadow-sm"
+                            style={{ height: '1.2rem' }}
+                            alt="user"
+                          />
+                          <p className="m-0 user-select-none" style={{ fontSize: '12px' }}>
+                            {truncateText(item.name, 7)}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                   <div className="mt-2 d-flex gap-2">
                     <div>
@@ -380,9 +403,9 @@ export default function SetRecords() {
                         className="form-control"
                         placeholder="remark"
                         type="text"
-                        value={addRemark}
+                        value={recordState.addRemark}
                         onChange={(e) => {
-                          setAddRemark(e.target.value)
+                          recordDispatch({ type: 'set_addRemark', value: e.target.value })
                         }}
                       />
                     </div>
@@ -392,46 +415,27 @@ export default function SetRecords() {
                         className="form-control"
                         placeholder="debt"
                         type="number"
-                        value={addDebt}
+                        value={recordState.addDebt}
                         onChange={(e) => {
-                          setAddDebt(Number(e.target.value))
+                          recordDispatch({ type: 'set_addDebt', value: Number(e.target.value) })
                         }}
                       />
                     </div>
                   </div>
                   <div className="d-flex justify-content-end gap-2 mt-2">
                     <button
-                      className="btn btn-outline-danger btn-sm"
-                      onClick={() => {
-                        setNewTabOpenState(false)
-                      }}
-                    >
-                      關閉
-                    </button>
-                    <button
                       className="btn btn-outline-dark btn-sm"
                       onClick={() => {
-                        if (!addBorrower || !addDebtor || !addDebt || !addType || !addRemark)
+                        if (!recordState.addBorrower || !recordState.addDebtor || !recordState.addDebt || !recordState.addType || !recordState.addRemark)
                           return alert('請填寫完整資料')
-                        if (checkConflict(menuChange, addBorrower, addDebtor)) return
-                        setMenuChange((prev) => ({
-                          ...prev,
-                          records: [
-                            ...prev.records,
-                            {
-                              borrower: addType === 'debt' ? addDebtor : addBorrower,
-                              debtor: addType === 'debt' ? addBorrower : addDebtor,
-                              debt: addDebt,
-                              remark: addRemark,
-                            },
-                          ],
-                        }))
-                        setNewTabOpenState(false)
-                        setAddBorrower('')
-                        setAddDebtor('')
-                        setAddDebt(0)
-                        setAddRemark('')
-                        setAddType('')
+                        if (checkConflict(context.state.recordMenu, recordState.addBorrower, recordState.addDebtor)) return
+                        recordsInstance.current.records = {
+                          borrower: recordState.addType === 'debt' ? recordState.addDebtor : recordState.addBorrower,
+                          debtor: recordState.addType === 'debt' ? recordState.addBorrower : recordState.addDebtor,
+                          debt: recordState.addDebt,
+                          remark: recordState.addRemark,
+                        }
+                        recordDispatch({ type: 'clear' })
                       }}
                     >
                       新增
@@ -443,11 +447,11 @@ export default function SetRecords() {
               )}
               <hr />
               <div className="d-flex justify-content-end gap-2 mt-1">
-                {!newTabOpenState ? (
+                {!recordState.newTabOpenState ? (
                   <button
                     className="btn btn-outline-primary btn-sm"
                     onClick={() => {
-                      setNewTabOpenState(true)
+                      recordDispatch({ type: 'set_newTabOpenState', value: true })
                     }}
                   >
                     新增項目
@@ -458,7 +462,7 @@ export default function SetRecords() {
                 <button
                   className="btn btn-outline-secondary btn-sm"
                   onClick={() => {
-                    setMenuChange(context.state.recordMenu)
+                    recordsInstance.current.undoAllChanges()
                   }}
                 >
                   取消變更
@@ -468,10 +472,14 @@ export default function SetRecords() {
                   onClick={async () => {
                     if (!firstRef.current) return
                     firstRef.current = false
-                    await saveDatabaseCombined(calculateRecordsDiff(context.state.recordMenu.records, []), true)
+                    recordsInstance.current.deleteAllRecords()
+                    await saveDatabaseCombined(
+                      calculateRecordsDiff(context.state.recordMenu.records, []),
+                      true,
+                    )
                     alert('紀錄已刪除')
                     context.dispatch({ type: 'set_recordMenu', value: null })
-                    setEditMode(false)
+                    recordDispatch({ type: 'clear'})
                     firstRef.current = true
                   }}
                 >
@@ -482,13 +490,19 @@ export default function SetRecords() {
                   onClick={async () => {
                     if (!firstRef.current) return
                     firstRef.current = false
-                    if (menuChange.records.length === 0) return alert('請至少新增一筆紀錄')
-                    if (menuChange.title.trim() === '') return alert('請填寫標題')
-                    if (menuChange.description.trim() === '') return alert('請填寫描述')
-                    await saveDatabaseCombined(calculateRecordsDiff(context.state.records, menuChange.records))
+                    if (context.state.recordMenu.records.length === 0)
+                      return alert('請至少新增一筆紀錄')
+                    if (context.state.recordMenu.title.trim() === '') return alert('請填寫標題')
+                    if (context.state.recordMenu.description.trim() === '') return alert('請填寫描述')
+                    await saveDatabaseCombined(
+                      calculateRecordsDiff(
+                        recordsInstance.current.getOldRecords(),
+                        context.state.recordMenu.records,
+                      ),
+                    )
                     alert('紀錄已更新')
                     context.dispatch({ type: 'set_recordMenu', value: null })
-                    setEditMode(false)
+                    recordDispatch({ type: 'clear'})
                     firstRef.current = true
                   }}
                 >
@@ -499,6 +513,6 @@ export default function SetRecords() {
           </div>
         </div>
       </div>
-    )
-  else return ''
+    </RecordContext.Provider>
+  )
 }
