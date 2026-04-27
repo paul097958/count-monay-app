@@ -149,7 +149,6 @@ function App() {
                         id: doc.id,
                         ...doc.data(),
                     }))
-                    console.log('this is data', data)
                     dispatch({ type: 'set_recordsData', value: data })
                 }
                 dispatch({ type: 'set_loading', value: false })

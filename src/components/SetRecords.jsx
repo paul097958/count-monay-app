@@ -65,7 +65,7 @@ export default function SetRecords() {
       .filter((item) => {
         if (nameNewRecords.some((element) => element.id === item.id)) {
           const newElement = nameNewRecords.find((element) => element.id === item.id)
-          return item.debt !== newElement.debt
+          return item.debt !== newElement.debt || item.borrower !== newElement.borrower || item.debtor !== newElement.debtor
         } else {
           return false
         }
@@ -143,18 +143,18 @@ export default function SetRecords() {
         ]
         const recordData = recordDoc.data().records
         if (isDelete) {
-          send({
-            senderName: context.userInfo.current.name,
-            senderPhoto: context.userInfo.current.picture,
-            ...recordsInstance.current.getMessageData(recordData, '刪除')
-          })
+          // send({
+          //   senderName: context.userInfo.current.name,
+          //   senderPhoto: context.userInfo.current.picture,
+          //   ...recordsInstance.current.getMessageData(recordData, '刪除')
+          // })
           transaction.delete(docRecordRef)
         } else {
-          send({
-            senderName: context.userInfo.current.name || '未命名',
-            senderPhoto: context.userInfo.current.picture,
-            ...recordsInstance.current.getMessageData(recordData, '更改'),
-          })
+          // send({
+          //   senderName: context.userInfo.current.name || '未命名',
+          //   senderPhoto: context.userInfo.current.picture,
+          //   ...recordsInstance.current.getMessageData(recordData, '更改'),
+          // })
           transaction.update(docRecordRef, {
             title: context.state.recordMenu.title,
             description: context.state.recordMenu.description,
@@ -237,13 +237,32 @@ export default function SetRecords() {
             ) : (
               <p className="fs-6 text-secondary mb-0">{context.state.recordMenu.description || '未設定'}</p>
             )}
-            <button className="btn btn-outline-dark btn-sm mt-1" onClick={() => recordDispatch({ type: 'set_editMode', value: !recordState.editMode })}>
-              編輯
-            </button>
-            <div className="d-flex flex-column">
+            <div className='d-flex gap-3 border px-3 mt-2 rounded bg-light shadow-sm'>
+              {!recordState.newTabOpenState ? (
+                <i
+                  className="bi bi-plus-circle-fill text-primary fs-3"
+                  onClick={() => {
+                    recordDispatch({ type: 'set_newTabOpenState', value: true })
+                  }}
+                >
+                </i>
+              ) : (
+                ''
+              )}
+              <i className="bi bi-pencil-square fs-3 text-secondary" onClick={() => recordDispatch({ type: 'set_editMode', value: !recordState.editMode })}>
+              </i>
+              <i
+                className="bi bi-arrow-counterclockwise fs-3"
+                onClick={() => {
+                  recordsInstance.current.undoAllChanges()
+                  recordDispatch({ type: 'set_editMode', value: false})
+                }}
+              >
+              </i>
+            </div>
+            <div className="d-flex flex-column mt-4 gap-3">
               {context.state.recordMenu.records.map((item, index) => (
                 <div key={item.id}>
-                  <hr />
                   <div className="d-flex align-items-center">
                     {recordState.editMode ? (
                       <i
@@ -261,7 +280,7 @@ export default function SetRecords() {
                         style={{ height: '2rem' }}
                         alt="user"
                       />
-                      <p className="m-0" style={{ fontSize: '12px' }}>
+                      <p className="m-0 text-nowrap" style={{ fontSize: '12px' }}>
                         {getUserInfo(context.state.configData.users, item.borrower).name}
                       </p>
                     </div>
@@ -272,7 +291,7 @@ export default function SetRecords() {
                         style={{ height: '2rem' }}
                         alt="user"
                       />
-                      <p className="m-0" style={{ fontSize: '12px' }}>
+                      <p className="m-0 text-nowrap" style={{ fontSize: '12px' }}>
                         {getUserInfo(context.state.configData.users, item.debtor).name}
                       </p>
                     </div>
@@ -326,7 +345,6 @@ export default function SetRecords() {
                     <i
                       className="bi bi-x-lg fw-bold fs-6"
                       onClick={() => {
-                        context.dispatch({ type: 'set_recordMenu', value: null })
                         recordDispatch({ type: 'set_newTabOpenState', value: false })
                       }}
                     ></i>
@@ -445,30 +463,9 @@ export default function SetRecords() {
               ) : (
                 ''
               )}
-              <hr />
-              <div className="d-flex justify-content-end gap-2 mt-1">
-                {!recordState.newTabOpenState ? (
-                  <button
-                    className="btn btn-outline-primary btn-sm"
-                    onClick={() => {
-                      recordDispatch({ type: 'set_newTabOpenState', value: true })
-                    }}
-                  >
-                    新增項目
-                  </button>
-                ) : (
-                  ''
-                )}
-                <button
-                  className="btn btn-outline-secondary btn-sm"
-                  onClick={() => {
-                    recordsInstance.current.undoAllChanges()
-                  }}
-                >
-                  取消變更
-                </button>
-                <button
-                  className="btn btn-danger btn-sm"
+              <div className="d-flex justify-content-end align-items-center gap-3 mt-3">
+                <i
+                  className="bi bi-trash3-fill fs-3 text-danger"
                   onClick={async () => {
                     if (!firstRef.current) return
                     firstRef.current = false
@@ -479,14 +476,13 @@ export default function SetRecords() {
                     )
                     alert('紀錄已刪除')
                     context.dispatch({ type: 'set_recordMenu', value: null })
-                    recordDispatch({ type: 'clear'})
+                    recordDispatch({ type: 'clear' })
                     firstRef.current = true
                   }}
                 >
-                  刪除明細
-                </button>
-                <button
-                  className="btn btn-warning btn-sm"
+                </i>
+                <i
+                  className="bi bi-send-fill text-success fs-3"
                   onClick={async () => {
                     if (!firstRef.current) return
                     firstRef.current = false
@@ -502,12 +498,11 @@ export default function SetRecords() {
                     )
                     alert('紀錄已更新')
                     context.dispatch({ type: 'set_recordMenu', value: null })
-                    recordDispatch({ type: 'clear'})
+                    recordDispatch({ type: 'clear' })
                     firstRef.current = true
                   }}
                 >
-                  確認更改
-                </button>
+                </i>
               </div>
             </div>
           </div>

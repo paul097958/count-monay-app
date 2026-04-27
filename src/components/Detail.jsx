@@ -1,13 +1,9 @@
 import {
     doc,
-    getDoc,
     collection,
     getDocs,
     query,
     orderBy,
-    limit,
-    runTransaction,
-    startAfter,
     where,
     updateDoc,
 } from 'firebase/firestore'
@@ -452,6 +448,7 @@ export default function Detail() {
                             {Array.from({ length: 5 }, (_, i) => {
                                 const totalPage = Math.ceil(userRecords.length / 3)
                                 if (pageNumber <= 2) {
+                                    if(i + 1 > totalPage) return <></>
                                     return (
                                         <li className="page-item">
                                             <button className="page-link" onClick={() => setPageNumber(i + 1)}>
@@ -460,6 +457,7 @@ export default function Detail() {
                                         </li>
                                     )
                                 } else if (pageNumber >= totalPage - 2) {
+                                    if(totalPage - (i + 1) <= 0) return <></>
                                     return (
                                         <li className="page-item">
                                             <button
